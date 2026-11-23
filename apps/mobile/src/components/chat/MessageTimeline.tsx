@@ -8,7 +8,7 @@ import {
   type MaintainVisibleContentPositionConfig,
 } from "@legendapp/list/react-native";
 import { KeyboardAwareLegendList } from "@legendapp/list/keyboard";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import Animated, {
@@ -28,6 +28,8 @@ import { hapticSelection } from "@/lib/haptics";
 
 import { MessageBubble } from "./MessageBubble";
 import { messageItemType, messageKeyExtractor } from "./timeline-message-items";
+import { TurnActivityRow } from "./TurnActivityRow";
+import { buildTimelineRows, type TimelineRow } from "./turn-activity";
 import type { WorkspaceMarkdownPreviewTarget } from "./workspace-preview/markdown-target";
 import { RunningFooter } from "./RunningFooter";
 
@@ -42,7 +44,7 @@ const MAINTAIN_SCROLL_AT_END: MaintainScrollAtEndOptions = {
     layout: true,
   },
 };
-const MAINTAIN_VISIBLE_CONTENT_POSITION: MaintainVisibleContentPositionConfig<ChatMessage> = {
+const MAINTAIN_VISIBLE_CONTENT_POSITION: MaintainVisibleContentPositionConfig<TimelineRow> = {
   data: false,
   size: true,
 };
@@ -80,7 +82,7 @@ export function MessageTimeline({
   const listRef = useRef<LegendListRef | null>(null);
   const removeAtEndListenerRef = useRef<(() => void) | null>(null);
   const { bottom } = useSafeAreaInsets();
-  const rows = messages;
+  const rows = useMemo(() => buildTimelineRows(messages, isRunning), [messages, isRunning]);
   const timelineKey = threadId ?? "no-thread";
   const [isAtEnd, setIsAtEnd] = useState(true);
   const [settledTimelineKey, setSettledTimelineKey] = useState<string | undefined>(undefined);
@@ -143,15 +145,29 @@ export function MessageTimeline({
   }, [contentRevealProgress, showLoadingConversation]);
 
   const renderMessage = useCallback(
-    ({ item }: LegendListRenderItemProps<ChatMessage>) => (
-      <MessageBubble
-        message={item}
-        onMessageCopied={onMessageCopied}
-        onMessageRewind={onMessageRewind}
-        onOpenMarkdownAttachment={onOpenMarkdownAttachment}
-      />
-    ),
-    [onMessageCopied, onMessageRewind, onOpenMarkdownAttachment],
+    ({ item, index }: LegendListRenderItemProps<TimelineRow>) =>
+      item.type === "activity" ? (
+        <TurnActivityRow
+          activity={item.activity}
+          onMessageCopied={onMessageCopied}
+          onOpenMarkdownAttachment={onOpenMarkdownAttachment}
+        />
+      ) : (
+        <MessageBubble
+          followsTurnActivity={
+            item.message.role === "assistant" &&
+            item.message.kind === "chat" &&
+            item.message.details?.delivery !== "async" &&
+            rows[index - 1]?.type === "activity"
+          }
+          message={item.message}
+          isThreadRunning={isRunning && item.message.kind === "thinking"}
+          onMessageCopied={onMessageCopied}
+          onMessageRewind={onMessageRewind}
+          onOpenMarkdownAttachment={onOpenMarkdownAttachment}
+        />
+      ),
+    [isRunning, onMessageCopied, onMessageRewind, onOpenMarkdownAttachment, rows],
   );
   const handleTimelineLoad = useCallback(() => {
     requestAnimationFrame(() => {
@@ -197,9 +213,15 @@ export function MessageTimeline({
               data={rows}
               estimatedItemSize={MESSAGE_ESTIMATED_ITEM_SIZE}
               freeze={keyboardLayoutFrozen}
-              getItemType={messageItemType}
+              getItemType={(row) =>
+                row.type === "activity" ? "activity" : messageItemType(row.message)
+              }
               initialScrollAtEnd
-              keyExtractor={messageKeyExtractor}
+              keyExtractor={(row) =>
+                row.type === "activity"
+                  ? `activity:${row.activity.id}`
+                  : messageKeyExtractor(row.message)
+              }
               renderItem={renderMessage}
               contentContainerStyle={styles.content}
               keyboardDismissMode="interactive"
@@ -286,7 +308,7 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
   },
   listEndPad: {
-    height: Spacing.two,
+    height: Spacing.one,
   },
   pressed: {
     opacity: 0.7,

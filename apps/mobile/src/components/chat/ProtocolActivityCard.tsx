@@ -19,7 +19,13 @@ import { markMessageApprovalResolvedState } from "@/lib/server-state";
 
 const INLINE_PATCH_LINE_LIMIT = 48;
 
-export function ProtocolActivityCard({ message }: { message: ChatMessage }) {
+export function ProtocolActivityCard({
+  message,
+  isThreadRunning,
+}: {
+  message: ChatMessage;
+  isThreadRunning: boolean;
+}) {
   const [isDetailVisible, setIsDetailVisible] = useState(false);
   const [answer, setAnswer] = useState("");
   const [isResolving, setResolving] = useState(false);
@@ -42,6 +48,49 @@ export function ProtocolActivityCard({ message }: { message: ChatMessage }) {
   const isInputRequest =
     approvalKind === "structuredUserInput" || approvalKind === "mcpElicitation";
   const needsUserAction = canResolve;
+
+  if (message.kind === "thinking") {
+    const parts = reasoningSummaryParts(message);
+    const streaming = isThreadRunning && message.state === "streaming";
+    if (parts.length === 0 && !streaming) {
+      return null;
+    }
+    const previewPart = streaming ? parts.at(-1) : parts[0];
+    const preview = previewPart?.split("\n").find((line) => line.trim());
+    const label = t(streaming ? "Thinking" : "Thinking summary");
+    return (
+      <View style={styles.reasoningActivity}>
+        <Pressable
+          accessibilityLabel={label}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: isDetailVisible, disabled: parts.length === 0 }}
+          disabled={parts.length === 0}
+          onPress={() => setIsDetailVisible((visible) => !visible)}
+          style={({ pressed }) => [pressed && styles.rowPressed]}
+        >
+          <View style={styles.reasoningHeader}>
+            {streaming ? <ActivityIndicator size="small" color={theme.textSecondary} /> : null}
+            <ThemedText type="smallBold" themeColor="textSecondary">
+              {label}
+            </ThemedText>
+            {parts.length > 0 ? (
+              <Icon
+                name={isDetailVisible ? "expand" : "chevronRight"}
+                size={13}
+                tintColor={theme.textSecondary}
+              />
+            ) : null}
+          </View>
+          {!isDetailVisible && preview ? (
+            <ActivityMarkdown markdown={preview} variant="compact" />
+          ) : null}
+        </Pressable>
+        {isDetailVisible && parts.length > 0 ? (
+          <ActivityMarkdown markdown={parts.join("\n\n")} selectable variant="compact" />
+        ) : null}
+      </View>
+    );
+  }
 
   async function submitDecision(decision: "approve" | "approve-for-session" | "deny" | "cancel") {
     if (!approvalId || isResolving) {
@@ -90,7 +139,7 @@ export function ProtocolActivityCard({ message }: { message: ChatMessage }) {
           <ThemedText type="code" style={[styles.planLabel, { color: model.color }]}>
             {t("Plan")}
           </ThemedText>
-          <PlanMarkdown markdown={planBody(message)} variant="compact" />
+          <ActivityMarkdown markdown={planBody(message)} variant="compact" />
         </Pressable>
 
         <ActivityDetailSheet
@@ -509,7 +558,7 @@ function ActivityDetailSheet({
       <View style={styles.sheetContent}>
         {isPlan ? (
           <View style={styles.planDetailBody}>
-            <PlanMarkdown markdown={planBody(message)} selectable variant="detail" />
+            <ActivityMarkdown markdown={planBody(message)} selectable variant="detail" />
           </View>
         ) : (
           sections.map((section) => {
@@ -592,12 +641,6 @@ function activityModel(message: ChatMessage): ActivityModel {
         label: t("Searched"),
         detail: stringDetail(message, "query") ?? message.content,
       };
-    case "thinking":
-      return {
-        color: "#9B8BD4",
-        label: t("Thinking"),
-        detail: firstLine(message.content),
-      };
     case "plan":
       return {
         color: "#9B8BD4",
@@ -624,6 +667,16 @@ function activityModel(message: ChatMessage): ActivityModel {
       };
     case "toolActivity":
     default:
+      if (stringDetail(message, "type") === "dynamicToolCall") {
+        const status = stringDetail(message, "status");
+        const failed = status === "failed" || message.details?.success === false;
+        const running = status === "inProgress" || message.state === "streaming";
+        return {
+          color: failed ? "#C7776A" : "#78B88B",
+          label: t(failed ? "Tool call failed" : running ? "Calling tool" : "Called"),
+          detail: dynamicToolLabel(stringDetail(message, "tool")),
+        };
+      }
       return {
         color: "#78B88B",
         label: t("Called"),
@@ -663,7 +716,6 @@ function detailSections(message: ChatMessage): DetailSection[] {
         detailSection(t("Raw"), JSON.stringify(message.details ?? {}, null, 2), true),
       ]);
     case "subagentAction":
-    case "thinking":
     default:
       return compactSections([detailSection(t("Details"), message.content || t("No details."))]);
   }
@@ -730,7 +782,7 @@ function compactSections(sections: Array<DetailSection | undefined>) {
   return sections.filter((section): section is DetailSection => Boolean(section));
 }
 
-function PlanMarkdown({
+export function ActivityMarkdown({
   markdown,
   selectable = false,
   variant,
@@ -860,6 +912,32 @@ function toolDetail(message: ChatMessage) {
   const server = stringDetail(message, "server");
   const tool = stringDetail(message, "tool");
   return [server, tool].filter(Boolean).join(".") || firstLine(message.content);
+}
+
+function dynamicToolLabel(tool?: string) {
+  switch (tool) {
+    case "read_thread":
+      return t("Read conversation");
+    case "wait_threads":
+      return t("Wait for conversations");
+    default:
+      return tool || t("Tool");
+  }
+}
+
+function reasoningSummaryParts(message: ChatMessage): string[] {
+  const summary = message.details?.summary;
+  if (Array.isArray(summary)) {
+    return summary.filter(
+      (part): part is string => typeof part === "string" && Boolean(part.trim()),
+    );
+  }
+  // Older cached records can contain separate raw reasoning text.
+  return message.details?.content === undefined &&
+    message.content.trim() &&
+    message.content !== "Reasoning"
+    ? [message.content]
+    : [];
 }
 
 function fileChangeLabel(message: ChatMessage) {
@@ -1472,6 +1550,19 @@ function firstLine(value: string) {
 }
 
 const styles = StyleSheet.create((theme) => ({
+  reasoningActivity: {
+    alignSelf: "stretch",
+    borderLeftColor: theme.border,
+    borderLeftWidth: 2,
+    gap: Spacing.one,
+    paddingLeft: Spacing.three,
+  },
+  reasoningHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: Spacing.two,
+    minHeight: 32,
+  },
   actionWrap: {
     alignSelf: "stretch",
     gap: Spacing.two,

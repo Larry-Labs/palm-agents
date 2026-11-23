@@ -3342,7 +3342,7 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 15,
     lineHeight: 22,
     maxHeight: 132,
-    minHeight: 56,
+    minHeight: 36,
     paddingHorizontal: 2,
     paddingTop: 0,
     paddingBottom: 0,

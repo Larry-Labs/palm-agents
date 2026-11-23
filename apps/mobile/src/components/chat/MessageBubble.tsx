@@ -13,6 +13,7 @@ import {
   View,
   type StyleProp,
   type TextStyle,
+  type ViewStyle,
 } from "react-native";
 import { dfetchDownload } from "react-native-direct-fetch";
 import { EnrichedMarkdownText, type MarkdownStyle } from "react-native-enriched-markdown";
@@ -114,11 +115,15 @@ type MarkdownSegment =
   | { code: string; kind: "code"; language: string };
 
 export const MessageBubble = memo(function MessageBubble({
+  followsTurnActivity = false,
+  isThreadRunning,
   message,
   onMessageCopied,
   onMessageRewind,
   onOpenMarkdownAttachment,
 }: {
+  followsTurnActivity?: boolean;
+  isThreadRunning: boolean;
   message: ChatMessage;
   onMessageCopied?: () => void;
   onMessageRewind?: (message: ChatMessage) => void;
@@ -253,6 +258,9 @@ export const MessageBubble = memo(function MessageBubble({
         fontFamily: Fonts.sans,
         underline: false,
       },
+      inlineMath: {
+        color: theme.text,
+      },
       list: {
         color: theme.text,
         fontFamily: Fonts.sans,
@@ -273,6 +281,13 @@ export const MessageBubble = memo(function MessageBubble({
         marginBottom: 8,
         marginTop: 0,
       },
+      math: {
+        backgroundColor: "transparent",
+        color: theme.text,
+        fontSize: 16,
+        marginBottom: 8,
+        marginTop: 4,
+      },
       strong: {
         color: theme.text,
         fontFamily: Fonts.sansSemiBold,
@@ -292,7 +307,7 @@ export const MessageBubble = memo(function MessageBubble({
   if (isProtocolActivity(message)) {
     return (
       <View style={styles.protocolRow}>
-        <ProtocolActivityCard message={message} />
+        <ProtocolActivityCard message={message} isThreadRunning={isThreadRunning} />
       </View>
     );
   }
@@ -350,7 +365,13 @@ export const MessageBubble = memo(function MessageBubble({
   }
 
   return (
-    <View style={[styles.row, isUser ? styles.userRow : styles.assistantRow]}>
+    <View
+      style={[
+        styles.row,
+        isUser ? styles.userRow : styles.assistantRow,
+        followsTurnActivity && styles.replyAfterActivity,
+      ]}
+    >
       <View
         style={[
           styles.bubble,
@@ -361,30 +382,38 @@ export const MessageBubble = memo(function MessageBubble({
       >
         {isAssistant ? (
           <View style={styles.assistantContent}>
-            <ThemedText type="code" themeColor="textSecondary" style={styles.assistantLabel}>
+            <ThemedText
+              type="code"
+              themeColor="textSecondary"
+              style={[styles.assistantLabel, followsTurnActivity && styles.activityReplyLabel]}
+            >
               Codex
             </ThemedText>
-            {markdownSegments.map((segment, index) =>
-              segment.kind === "code" ? (
-                <HighlightedCodeBlock
-                  key={messageSegmentRenderKey(segment, index)}
-                  code={segment.code}
-                  deferHighlight={message.state === "streaming"}
-                  language={segment.language}
-                />
-              ) : (
-                <EnrichedMarkdownText
-                  allowFontScaling={false}
-                  key={messageSegmentRenderKey(segment, index)}
-                  maxFontSizeMultiplier={1}
-                  markdown={messageMarkdownContentForRender(segment.content)}
-                  selectable
-                  // Tiny Codex deltas restart the native fade before intermediate text is presented.
-                  streamingAnimation={false}
-                  markdownStyle={assistantMarkdownStyle}
-                />
-              ),
-            )}
+            <View style={styles.assistantBody}>
+              {markdownSegments.map((segment, index) =>
+                segment.kind === "code" ? (
+                  <HighlightedCodeBlock
+                    key={messageSegmentRenderKey(segment, index)}
+                    code={segment.code}
+                    deferHighlight={message.state === "streaming"}
+                    language={segment.language}
+                    style={styles.inlineCodeBlock}
+                  />
+                ) : (
+                  <EnrichedMarkdownText
+                    allowFontScaling={false}
+                    flavor="github"
+                    key={messageSegmentRenderKey(segment, index)}
+                    maxFontSizeMultiplier={1}
+                    markdown={messageMarkdownContentForRender(segment.content)}
+                    selectable
+                    // Tiny Codex deltas restart the native fade before intermediate text is presented.
+                    streamingAnimation={false}
+                    markdownStyle={assistantMarkdownStyle}
+                  />
+                ),
+              )}
+            </View>
             <MessageAttachments
               imageUris={imageUris}
               markdownAttachments={markdownAttachments}
@@ -456,7 +485,7 @@ function MessageFooter({
 }) {
   const theme = useTheme();
   const isUser = variant === "user";
-  const iconTint = isUser ? theme.textSecondary : "rgba(214, 222, 232, 0.62)";
+  const iconTint = theme.textSecondary;
 
   return (
     <View style={[styles.messageFooter, isUser && styles.userMessageFooter]}>
@@ -1006,13 +1035,13 @@ function parseMarkdownSegments(markdown: string): MarkdownSegment[] {
         codeLanguage = "";
         isInCodeBlock = false;
       } else {
-        if (markdownLines.length > 0) {
+        if (markdownLines.some((line) => line.trim())) {
           segments.push({
             content: markdownLines.join("\n"),
             kind: "markdown",
           });
-          markdownLines.length = 0;
         }
+        markdownLines.length = 0;
         codeLanguage = normalizeCodeLanguage(fenceMatch[1] ?? "");
         isInCodeBlock = true;
       }
@@ -1035,7 +1064,7 @@ function parseMarkdownSegments(markdown: string): MarkdownSegment[] {
     });
   }
 
-  if (markdownLines.length > 0) {
+  if (markdownLines.some((line) => line.trim())) {
     segments.push({
       content: markdownLines.join("\n"),
       kind: "markdown",
@@ -1053,10 +1082,12 @@ export const HighlightedCodeBlock = memo(function HighlightedCodeBlock({
   code,
   deferHighlight = false,
   language,
+  style,
 }: {
   code: string;
   deferHighlight?: boolean;
   language: string;
+  style?: StyleProp<ViewStyle>;
 }) {
   const theme = useTheme();
   return (
@@ -1067,6 +1098,7 @@ export const HighlightedCodeBlock = memo(function HighlightedCodeBlock({
           backgroundColor: theme.backgroundSelected,
           borderColor: "rgba(132, 145, 165, 0.25)",
         },
+        style,
       ]}
     >
       {language ? (
@@ -1205,7 +1237,11 @@ function formatMessageTime(value: string) {
 
 const styles = StyleSheet.create((theme) => ({
   row: {
-    marginVertical: Spacing.two,
+    marginBottom: Spacing.two,
+    marginTop: Spacing.two,
+  },
+  replyAfterActivity: {
+    marginTop: 0,
   },
   userRow: {
     alignItems: "flex-end",
@@ -1236,6 +1272,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   assistantContent: {
     paddingHorizontal: 0,
+  },
+  assistantBody: {
+    gap: Spacing.two,
   },
   errorBubble: {
     backgroundColor: "rgba(216, 79, 79, 0.16)",
@@ -1352,6 +1391,9 @@ const styles = StyleSheet.create((theme) => ({
     marginBottom: Spacing.one,
     opacity: 0.7,
   },
+  activityReplyLabel: {
+    marginBottom: 0,
+  },
   messageFooter: {
     alignItems: "center",
     flexDirection: "row",
@@ -1408,6 +1450,10 @@ const styles = StyleSheet.create((theme) => ({
     marginTop: 2,
     overflow: "hidden",
   },
+  inlineCodeBlock: {
+    marginBottom: 0,
+    marginTop: 0,
+  },
   codeBlockLanguage: {
     borderBottomColor: "rgba(132, 145, 165, 0.18)",
     borderBottomWidth: 1,
@@ -1444,6 +1490,7 @@ function isProtocolActivity(message: ChatMessage) {
     message.kind === "subagentAction" ||
     message.kind === "thinking" ||
     message.kind === "toolActivity" ||
+    (message.kind === "unknown" && message.details?.type === "dynamicToolCall") ||
     message.kind === "webSearch"
   );
 }
