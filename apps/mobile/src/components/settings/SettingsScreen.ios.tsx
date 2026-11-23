@@ -77,7 +77,8 @@ export function SettingsScreen() {
     openProjectLink,
     pushNotificationPreferences,
     pushNotificationsLoading,
-    pushNotificationsSupported,
+    pushNotificationsAvailable,
+    pushNotificationsUnavailableMessage,
     pushNotificationsUpdating,
     rateLimitRows,
     rateLimitsFetching,
@@ -245,15 +246,15 @@ export function SettingsScreen() {
               <Section
                 title={t("Notifications")}
                 footer={
-                  <Text>
-                    {pushNotificationsSupported
-                      ? t("Generic alerts only. Chat content stays on your paired computer.")
-                      : t("Push notifications are available in the iOS and Android apps.")}
-                  </Text>
+                  pushNotificationsAvailable ? (
+                    <Text>
+                      {t("Generic alerts only. Chat content stays on your paired computer.")}
+                    </Text>
+                  ) : undefined
                 }
                 modifiers={[listRowBackground(theme.surface)]}
               >
-                {pushNotificationsSupported ? (
+                {pushNotificationsAvailable ? (
                   <>
                     <NotificationToggle
                       disabled={notificationsDisabled}
@@ -283,7 +284,9 @@ export function SettingsScreen() {
                       title={t("Action required")}
                     />
                   </>
-                ) : null}
+                ) : (
+                  <Text modifiers={secondaryText}>{pushNotificationsUnavailableMessage}</Text>
+                )}
               </Section>
             ) : null}
 
@@ -341,13 +344,6 @@ export function SettingsScreen() {
                   }
                 >
                   <Text modifiers={footnote}>{codexRelayRepositoryLabel}</Text>
-                </LabeledContent>
-              </Button>
-              <Button onPress={() => openProjectLink(codexRelaySponsorUrl)}>
-                <LabeledContent
-                  label={<Label title={t("Sponsor")} systemImage="heart.fill" color="#FF9FC0" />}
-                >
-                  <Text modifiers={footnote}>{codexRelaySponsorLabel}</Text>
                 </LabeledContent>
               </Button>
             </Section>

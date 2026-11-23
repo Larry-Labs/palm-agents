@@ -1,6 +1,5 @@
 import { useTheme } from "@/hooks/use-theme";
 import { t } from "../../i18n";
-import { Heart } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, ScrollView, Switch, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LinearTransition } from "react-native-reanimated";
@@ -51,7 +50,8 @@ export function SettingsScreen() {
     openProjectLink,
     pushNotificationPreferences,
     pushNotificationsLoading,
-    pushNotificationsSupported,
+    pushNotificationsAvailable,
+    pushNotificationsUnavailableMessage,
     pushNotificationsUpdating,
     rateLimitRows,
     rateLimitsFetching,
@@ -260,7 +260,7 @@ export function SettingsScreen() {
                 {t("Notifications")}
               </ThemedText>
               <Animated.View layout={settingsLayoutTransition} style={styles.notificationPanel}>
-                {pushNotificationsSupported ? (
+                {pushNotificationsAvailable ? (
                   <>
                     <ThemedText
                       type="small"
@@ -309,7 +309,7 @@ export function SettingsScreen() {
                     themeColor="textSecondary"
                     style={styles.notificationIntro}
                   >
-                    {t("Push notifications are available in the iOS and Android apps.")}
+                    {pushNotificationsUnavailableMessage}
                   </ThemedText>
                 )}
               </Animated.View>
@@ -526,30 +526,6 @@ export function SettingsScreen() {
                     numberOfLines={1}
                   >
                     {codexRelayRepositoryLabel}
-                  </ThemedText>
-                </View>
-                <Icon name="externalLink" size={15} tintColor={theme.textSecondary} />
-              </Pressable>
-              <Pressable
-                accessibilityRole="link"
-                accessibilityLabel={t("Open gronxb GitHub Sponsors")}
-                onPress={() => openProjectLink(codexRelaySponsorUrl)}
-                style={({ pressed }) => [styles.projectLinkRow, pressed && styles.pressed]}
-              >
-                <View style={[styles.projectLinkIcon, styles.projectLinkIconSponsor]}>
-                  <Heart size={16} color="#FF9FC0" fill="#FF9FC0" />
-                </View>
-                <View style={styles.projectLinkCopy}>
-                  <ThemedText type="smallBold" style={styles.projectLinkTitle}>
-                    {t("Sponsor")}
-                  </ThemedText>
-                  <ThemedText
-                    type="code"
-                    themeColor="textSecondary"
-                    style={styles.projectLinkSubtitle}
-                    numberOfLines={1}
-                  >
-                    {codexRelaySponsorLabel}
                   </ThemedText>
                 </View>
                 <Icon name="externalLink" size={15} tintColor={theme.textSecondary} />
@@ -827,10 +803,6 @@ const styles = StyleSheet.create((theme) => ({
     height: 30,
     justifyContent: "center",
     width: 30,
-  },
-  projectLinkIconSponsor: {
-    backgroundColor: "rgba(255, 159, 192, 0.12)",
-    borderColor: "rgba(255, 159, 192, 0.22)",
   },
   projectLinkCopy: {
     flex: 1,

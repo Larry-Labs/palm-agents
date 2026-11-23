@@ -5,6 +5,7 @@ import { getPushNotificationSettings, registerPushNotifications } from "@/lib/co
 import {
   defaultPushNotificationPreferences,
   getExpoPushToken,
+  hasExpoPushProject,
   hasCompletedInitialPushNotificationRegistration,
   markInitialPushNotificationRegistrationCompleted,
   PushNotificationPermissionDeniedError,
@@ -22,6 +23,7 @@ export function useInitialPushNotificationRegistration() {
       !hasPairedSession ||
       registrationStartedRef.current ||
       !supportsPushNotifications() ||
+      !hasExpoPushProject() ||
       hasCompletedInitialPushNotificationRegistration()
     ) {
       return;

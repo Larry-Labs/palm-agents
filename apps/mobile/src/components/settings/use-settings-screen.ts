@@ -27,6 +27,7 @@ import { formatMobileReleaseVersion } from "@/lib/mobile-release-version";
 import {
   defaultPushNotificationPreferences,
   getExpoPushToken,
+  hasExpoPushProject,
   markInitialPushNotificationRegistrationCompleted,
   pushNotificationPlatform,
   supportsPushNotifications,
@@ -105,6 +106,10 @@ export function useSettingsScreen() {
   const [pushNotificationsLoading, setPushNotificationsLoading] = useState(false);
   const [pushNotificationsUpdating, setPushNotificationsUpdating] = useState(false);
   const pushNotificationsSupported = supportsPushNotifications();
+  const pushNotificationsAvailable = pushNotificationsSupported && hasExpoPushProject();
+  const pushNotificationsUnavailableMessage = pushNotificationsSupported
+    ? t("Push notifications are not configured in this build.")
+    : t("Push notifications are available in the iOS and Android apps.");
   const rateLimitRows = visibleRateLimitRows(rateLimitsQuery.data?.buckets ?? []);
   const isAppUpdatePending =
     appUpdate.status === "downloading" ||
@@ -188,7 +193,7 @@ export function useSettingsScreen() {
 
   useEffect(() => {
     let isActive = true;
-    if (!hasPairedSession || !pushNotificationsSupported) {
+    if (!hasPairedSession || !pushNotificationsAvailable) {
       setPushNotificationPreferences(defaultPushNotificationPreferences);
       setPushNotificationsLoading(false);
       return () => {
@@ -217,7 +222,7 @@ export function useSettingsScreen() {
     return () => {
       isActive = false;
     };
-  }, [hasPairedSession, pushNotificationsSupported, serverUrl]);
+  }, [hasPairedSession, pushNotificationsAvailable, serverUrl]);
 
   function closeSettings() {
     hapticSelection();
@@ -240,7 +245,7 @@ export function useSettingsScreen() {
     preference: PushNotificationPreference,
     value: boolean,
   ) {
-    if (pushNotificationsUpdating || !pushNotificationsSupported) {
+    if (pushNotificationsUpdating || !pushNotificationsAvailable) {
       return;
     }
 
@@ -363,7 +368,8 @@ export function useSettingsScreen() {
     openProjectLink,
     pushNotificationPreferences,
     pushNotificationsLoading,
-    pushNotificationsSupported,
+    pushNotificationsAvailable,
+    pushNotificationsUnavailableMessage,
     pushNotificationsUpdating,
     rateLimitRows,
     rateLimitsFetching: rateLimitsQuery.isFetching,

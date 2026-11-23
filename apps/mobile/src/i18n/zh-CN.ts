@@ -388,7 +388,6 @@ export const zhCN = {
   "Open app settings for camera access": "前往设置开启相机权限",
   "Open branch switcher": "选择分支",
   "Open details for Plan": "查看计划详情",
-  "Open gronxb GitHub Sponsors": "赞助上游作者",
   "Open new chat": "新建会话",
   "Open parent folder": "打开上级文件夹",
   "Open settings": "打开设置",
@@ -435,6 +434,7 @@ export const zhCN = {
     "推送通知仅在 iOS 和 Android 客户端中可用。",
   "Push notifications are available only in the iOS and Android apps.":
     "推送通知仅在 iOS 和 Android 客户端中可用。",
+  "Push notifications are not configured in this build.": "当前版本尚未配置推送通知。",
   "QR detected. Pairing...": "已识别二维码，正在配对…",
   Query: "查询",
   Questions: "问题",
@@ -528,7 +528,6 @@ export const zhCN = {
   "Skills unavailable": "技能不可用",
   "Some images were skipped": "部分图片未添加",
   Speed: "速度",
-  Sponsor: "赞助",
   Standard: "标准",
   "Standard speed and usage": "标准速度与用量",
   "Start the relay": "启动 Relay",
@@ -565,7 +564,6 @@ export const zhCN = {
   "{0} · View activity": "{0} · 查看过程",
   "{0}m {1}s": "{0}分{1}秒",
   "{0}s": "{0}秒",
-  "This app build is missing its Expo project identifier.": "此应用缺少 Expo 项目标识。",
   "This app expects a newer relay package than the connected server.":
     "此应用需要更新版本的 Relay 服务器。",
   "This attachment could not be opened.": "无法打开此附件。",

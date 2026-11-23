@@ -44,7 +44,16 @@ export function supportsPushNotifications() {
   return Platform.OS === "android" || Platform.OS === "ios";
 }
 
+export function hasExpoPushProject() {
+  return Boolean(expoProjectId());
+}
+
 export async function getExpoPushToken() {
+  const projectId = expoProjectId();
+  if (!projectId) {
+    throw new Error(t("Push notifications are not configured in this build."));
+  }
+
   const platform = pushNotificationPlatform();
   if (platform === "android") {
     await Notifications.setNotificationChannelAsync("default", {
@@ -62,10 +71,6 @@ export async function getExpoPushToken() {
     throw new PushNotificationPermissionDeniedError();
   }
 
-  const projectId = expoProjectId();
-  if (!projectId) {
-    throw new Error(t("This app build is missing its Expo project identifier."));
-  }
   return (await Notifications.getExpoPushTokenAsync({ projectId })).data;
 }
 
