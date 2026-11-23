@@ -1,4 +1,17 @@
-# Codex Relay
+# Palm Agents · 掌上 Agents
+
+Palm Agents is an independent iPhone client based on [Codex Relay](https://github.com/gronxb/codex-relay), with Simplified Chinese UI, system light/dark appearance, and mobile bug fixes. Follow and steer coding agents on your own computer from your phone.
+
+The development branch is `dev/palm-agents`. See [the development and build guide](./docs/iphone-cn.md) for current features, limitations, and iOS build instructions. A signed Palm Agents app has not been released yet.
+
+To start Palm Agents Relay on your computer or NAS, run `npx @larry-labs/palm-agents-relay@latest` from the workspace you want to use. Scan the QR code in Palm Agents to pair.
+
+<details>
+<summary>Original Codex Relay documentation and attribution</summary>
+
+The documentation, store links, screenshots, and brand assets below describe the upstream Codex Relay project.
+
+## Codex Relay
 
 <p align="center">
   <img src="./docs/readme-assets/icon.png" alt="Codex Relay app icon" width="96" />
@@ -240,3 +253,5 @@ Codex Relay is licensed under the Apache License 2.0. See [LICENSE](./LICENSE).
 
 The Codex Relay name, logos, app icons, screenshots, and other brand assets are
 not licensed under Apache-2.0. See [TRADEMARKS.md](./TRADEMARKS.md).
+
+</details>

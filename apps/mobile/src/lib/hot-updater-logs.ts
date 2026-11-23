@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { HotUpdaterProgressEvent } from "@hot-updater/react-native";
 import { useSyncExternalStore } from "react";
 
@@ -141,7 +142,7 @@ function formatByteSummary(downloadedBytes: number | undefined, totalBytes: numb
     return `${formatBytes(downloadedBytes)} / ${formatBytes(totalBytes)}`;
   }
 
-  return `${formatBytes(downloadedBytes)} downloaded`;
+  return t("{0} downloaded", formatBytes(downloadedBytes));
 }
 
 function formatBytes(bytes: number) {

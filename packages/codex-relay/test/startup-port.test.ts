@@ -45,8 +45,8 @@ test("an occupied port reports recovery instructions without overwriting running
     });
     expect(result.code).toBe(1);
     expect(result.stderr).toContain(`127.0.0.1:${address.port} is already in use`);
-    expect(result.stderr).toContain("npx codex-relay@latest qr");
-    expect(result.stderr).toContain("npx codex-relay@latest stop");
+    expect(result.stderr).toContain("npx @larry-labs/palm-agents-relay@latest qr");
+    expect(result.stderr).toContain("npx @larry-labs/palm-agents-relay@latest stop");
     expect(result.stderr).toContain(`-iTCP:${address.port}`);
     expect(result.stderr).toContain("CODEX_RELAY_HOME");
     expect(result.stderr).not.toContain("Unhandled 'error' event");

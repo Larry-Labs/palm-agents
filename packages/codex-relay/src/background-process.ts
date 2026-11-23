@@ -109,6 +109,7 @@ function isRelayProcessCommand(command: string) {
   const normalized = command.replaceAll("\\", "/");
   return (
     normalized.includes("codex-relay") ||
+    normalized.includes("palm-agents-relay") ||
     normalized.includes("/src/cli.ts") ||
     normalized.includes(" src/cli.ts")
   );

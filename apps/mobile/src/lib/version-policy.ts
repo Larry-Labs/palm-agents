@@ -1,10 +1,12 @@
+import { t } from "../i18n";
+import { relayInstallCommand } from "../constants/brand";
 import type { VersionResponse } from "codex-relay/api-schema";
 
 // Kept in the OTA-delivered JS bundle so compatibility can move with app updates.
 export const relayCompatibilityPolicy = {
   packageVersion: "1.6.0",
 } as const;
-export const relayUpdateCommand = "npx codex-relay@latest";
+export const relayUpdateCommand = relayInstallCommand;
 
 export type RelayVersionCompatibility =
   | {
@@ -30,9 +32,10 @@ export function evaluateRelayVersion(
   if (error) {
     return {
       compatible: false,
-      current: "Unavailable",
-      reason:
+      current: t("Unavailable"),
+      reason: t(
         "The app could not verify the relay version. Update the relay if this server was started from an older install.",
+      ),
       required: relayCompatibilityPolicy.packageVersion,
       updateCommand: relayUpdateCommand,
     };
@@ -72,21 +75,21 @@ function compareRelayVersions(current: string, required: string) {
   if (!currentSemver || !requiredSemver) {
     return {
       compatible: false,
-      reason: "The relay version could not be parsed as semver.",
+      reason: t("The relay version could not be parsed as semver."),
     };
   }
 
   if (currentSemver.major !== requiredSemver.major) {
     return {
       compatible: false,
-      reason: `This app expects codex-relay ${requiredSemver.major}.x.`,
+      reason: t("This app expects a {0}.x relay.", requiredSemver.major),
     };
   }
 
   if (compareSemver(currentSemver, requiredSemver) < 0) {
     return {
       compatible: false,
-      reason: "This app expects a newer relay package than the connected server.",
+      reason: t("This app expects a newer relay package than the connected server."),
     };
   }
 

@@ -1,3 +1,5 @@
+import { useTheme } from "@/hooks/use-theme";
+import { t } from "../../../i18n";
 import type { ListWorkspaceFilesResponse } from "codex-relay/api-schema";
 import { router } from "expo-router";
 import { LegendList, type LegendListRenderItemProps } from "@legendapp/list/react-native";
@@ -16,7 +18,7 @@ import { StyleSheet } from "react-native-unistyles";
 
 import { ThemedText } from "@/components/themed-text";
 import { Icon } from "@/components/ui/icon";
-import { Colors, Fonts, Spacing } from "@/constants/theme";
+import { Fonts, Spacing } from "@/constants/theme";
 import { getWorkspaceFileContent, listWorkspaceFiles } from "@/lib/codex-relay-api";
 import { hapticSelection } from "@/lib/haptics";
 import { workspaceFileContentQueryKey } from "@/lib/workspace-file-queries";
@@ -51,6 +53,7 @@ export const FileWorkspacePreviewTab = memo(function FileWorkspacePreviewTab({
 }: {
   workspacePath?: string;
 }) {
+  const theme = useTheme();
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query, 180);
   const [currentDirectory, setCurrentDirectory] = useState("");
@@ -196,10 +199,10 @@ export const FileWorkspacePreviewTab = memo(function FileWorkspacePreviewTab({
       keyboardShouldPersistTaps="always"
       refreshControl={
         <RefreshControl
-          colors={[Colors.dark.text]}
-          progressBackgroundColor={Colors.dark.backgroundElement}
+          colors={[theme.text]}
+          progressBackgroundColor={theme.backgroundElement}
           refreshing={isPullRefreshing}
-          tintColor={Colors.dark.text}
+          tintColor={theme.text}
           onRefresh={() => void refreshPreview()}
         />
       }
@@ -211,17 +214,17 @@ export const FileWorkspacePreviewTab = memo(function FileWorkspacePreviewTab({
           accessibilityRole="button"
           accessibilityState={{ expanded: isExplorerExpanded }}
           accessibilityLabel={
-            isExplorerExpanded ? "Collapse file explorer" : "Expand file explorer"
+            isExplorerExpanded ? t("Collapse file explorer") : t("Expand file explorer")
           }
           onPress={toggleExplorer}
           style={({ pressed }) => [styles.fileListHeader, pressed && styles.pressed]}
         >
           <View style={styles.fileListTitleButton}>
             <ThemedText type="smallBold" style={styles.fileListTitle}>
-              Explorer
+              {t("Explorer")}
             </ThemedText>
             <ThemedText type="code" themeColor="textSecondary" numberOfLines={1}>
-              {currentDirectory || "Workspace root"}
+              {currentDirectory || t("Workspace root")}
             </ThemedText>
           </View>
           <View style={styles.fileCountBadge}>
@@ -233,20 +236,20 @@ export const FileWorkspacePreviewTab = memo(function FileWorkspacePreviewTab({
             <Icon
               name={isExplorerExpanded ? "expand" : "chevronRight"}
               size={15}
-              tintColor={Colors.dark.textSecondary}
+              tintColor={theme.textSecondary}
             />
           </View>
         </Pressable>
         {isExplorerExpanded ? (
           <View style={styles.explorerBody}>
             <View style={styles.searchBar}>
-              <Icon name="search" size={15} tintColor={Colors.dark.textSecondary} />
+              <Icon name="search" size={15} tintColor={theme.textSecondary} />
               <TextInput
                 autoCapitalize="none"
                 autoCorrect={false}
                 onChangeText={setQuery}
-                placeholder="Filter current folder"
-                placeholderTextColor="#7A8493"
+                placeholder={t("Filter current folder")}
+                placeholderTextColor={theme.textSecondary}
                 returnKeyType="search"
                 style={styles.searchInput}
                 value={query}
@@ -254,28 +257,28 @@ export const FileWorkspacePreviewTab = memo(function FileWorkspacePreviewTab({
               {hasQuery ? (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Clear file search"
+                  accessibilityLabel={t("Clear file search")}
                   hitSlop={8}
                   onPress={clearQuery}
                   style={({ pressed }) => [styles.searchClearButton, pressed && styles.pressed]}
                 >
-                  <Icon name="x" size={14} tintColor={Colors.dark.textSecondary} />
+                  <Icon name="x" size={14} tintColor={theme.textSecondary} />
                 </Pressable>
               ) : null}
             </View>
             {isInitialLoading ? (
               <View style={styles.fileListViewportFrame}>
                 <View style={styles.loadingRow}>
-                  <ActivityIndicator color={Colors.dark.textSecondary} size="small" />
+                  <ActivityIndicator color={theme.textSecondary} size="small" />
                   <ThemedText type="small" themeColor="textSecondary">
-                    Loading files
+                    {t("Loading files")}
                   </ThemedText>
                 </View>
               </View>
             ) : filesQuery.error ? (
               <View style={styles.fileListViewportFrame}>
                 <View style={styles.emptyState}>
-                  <ThemedText type="smallBold">Unable to load files</ThemedText>
+                  <ThemedText type="smallBold">{t("Unable to load files")}</ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">
                     {errorMessage(filesQuery.error)}
                   </ThemedText>
@@ -300,9 +303,9 @@ export const FileWorkspacePreviewTab = memo(function FileWorkspacePreviewTab({
             ) : (
               <View style={styles.fileListViewportFrame}>
                 <View style={styles.emptyState}>
-                  <ThemedText type="smallBold">No files found</ThemedText>
+                  <ThemedText type="smallBold">{t("No files found")}</ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">
-                    Try another path or search term.
+                    {t("Try another path or search term.")}
                   </ThemedText>
                 </View>
               </View>
@@ -315,41 +318,41 @@ export const FileWorkspacePreviewTab = memo(function FileWorkspacePreviewTab({
         <View style={styles.editorHeader}>
           <View style={styles.editorTitleGroup}>
             <ThemedText type="smallBold" numberOfLines={1} style={styles.editorTitle}>
-              {fileContent?.name ?? selectedFile?.name ?? "Select a file"}
+              {fileContent?.name ?? selectedFile?.name ?? t("Select a file")}
             </ThemedText>
             <ThemedText type="code" themeColor="textSecondary" numberOfLines={1}>
-              {fileContent?.path ?? selectedPath ?? "Workspace"}
+              {fileContent?.path ?? selectedPath ?? t("Workspace")}
             </ThemedText>
           </View>
           <View style={styles.editorActions}>
-            <HeaderActionButton disabled={!canEditFile} label="Edit" onPress={openEditor} />
+            <HeaderActionButton disabled={!canEditFile} label={t("Edit")} onPress={openEditor} />
           </View>
         </View>
         <View style={styles.editorMetaRow}>
           <ThemedText type="code" themeColor="textSecondary" numberOfLines={1}>
-            {fileContent ? fileMeta(fileContent) : "No file selected"}
+            {fileContent ? fileMeta(fileContent) : t("No file selected")}
           </ThemedText>
         </View>
         <View style={styles.editorPreviewContent}>
           {fileContentQuery.isLoading && selectedPath ? (
             <View style={styles.editorLoading}>
-              <ActivityIndicator color={Colors.dark.textSecondary} size="small" />
+              <ActivityIndicator color={theme.textSecondary} size="small" />
               <ThemedText type="small" themeColor="textSecondary">
-                Loading file
+                {t("Loading file")}
               </ThemedText>
             </View>
           ) : fileContentQuery.error ? (
             <View style={styles.emptyState}>
-              <ThemedText type="smallBold">Unable to load file</ThemedText>
+              <ThemedText type="smallBold">{t("Unable to load file")}</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
                 {errorMessage(fileContentQuery.error)}
               </ThemedText>
             </View>
           ) : fileContent?.binary ? (
             <View style={styles.emptyState}>
-              <ThemedText type="smallBold">Binary file</ThemedText>
+              <ThemedText type="smallBold">{t("Binary file")}</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
-                This preview shows text files only.
+                {t("This preview shows text files only.")}
               </ThemedText>
             </View>
           ) : fileContent ? (
@@ -357,7 +360,8 @@ export const FileWorkspacePreviewTab = memo(function FileWorkspacePreviewTab({
               {fileContent.truncated ? (
                 <View style={styles.notice}>
                   <ThemedText type="small" themeColor="textSecondary">
-                    Previewing the first {formatBytes(Math.min(fileContent.size, 256 * 1024))}.
+                    {t("Previewing the first")}
+                    {formatBytes(Math.min(fileContent.size, 256 * 1024))}.
                   </ThemedText>
                 </View>
               ) : null}
@@ -370,9 +374,9 @@ export const FileWorkspacePreviewTab = memo(function FileWorkspacePreviewTab({
             </>
           ) : (
             <View style={styles.emptyState}>
-              <ThemedText type="smallBold">Select a file</ThemedText>
+              <ThemedText type="smallBold">{t("Select a file")}</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
-                Search or pick a file to preview it here.
+                {t("Search or pick a file to preview it here.")}
               </ThemedText>
             </View>
           )}
@@ -391,6 +395,7 @@ const FileEntryRow = memo(function FileEntryRow({
   selected: boolean;
   onSelect: (file: ExplorerEntry) => void;
 }) {
+  const theme = useTheme();
   const handlePress = useCallback(() => onSelect(file), [file, onSelect]);
   const isParentEntry = file.kind === "parent";
   const isDirectory = file.kind === "directory";
@@ -400,7 +405,7 @@ const FileEntryRow = memo(function FileEntryRow({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={isParentEntry ? "Go to parent folder" : `Open ${file.path}`}
+      accessibilityLabel={isParentEntry ? t("Go to parent folder") : t("Open {0}", file.path)}
       onPress={handlePress}
       style={({ pressed }) => [
         styles.filePill,
@@ -411,7 +416,7 @@ const FileEntryRow = memo(function FileEntryRow({
     >
       <View style={styles.fileIconSlot}>
         {isParentEntry ? null : (
-          <Icon name={iconName} size={15} tintColor={selected ? Colors.dark.text : accentColor} />
+          <Icon name={iconName} size={15} tintColor={selected ? theme.text : accentColor} />
         )}
       </View>
       <View style={styles.fileRowTextGroup}>
@@ -499,7 +504,7 @@ function formatBytes(bytes: number) {
 }
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Unknown error";
+  return error instanceof Error ? error.message : t("Unknown error");
 }
 
 function languageFromPath(path: string) {
@@ -517,7 +522,7 @@ function fileEntryKeyExtractor(file: ExplorerEntry) {
   return `${file.kind}:${file.path}`;
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   contentPane: {
     flex: 1,
   },
@@ -528,7 +533,7 @@ const styles = StyleSheet.create({
   },
   searchBar: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.07)",
+    backgroundColor: theme.subtle,
     borderColor: "rgba(132, 145, 165, 0.22)",
     borderCurve: "continuous",
     borderRadius: 8,
@@ -539,7 +544,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two,
   },
   searchInput: {
-    color: Colors.dark.text,
+    color: theme.text,
     flex: 1,
     fontFamily: Fonts.sansMedium,
     fontSize: 13,
@@ -555,7 +560,7 @@ const styles = StyleSheet.create({
     width: 24,
   },
   fileListFrame: {
-    backgroundColor: "rgba(255, 255, 255, 0.055)",
+    backgroundColor: theme.subtle,
     borderColor: "rgba(132, 145, 165, 0.2)",
     borderCurve: "continuous",
     borderRadius: 8,
@@ -589,7 +594,7 @@ const styles = StyleSheet.create({
   },
   fileCountBadge: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.065)",
+    backgroundColor: theme.subtle,
     borderColor: "rgba(132, 145, 165, 0.18)",
     borderCurve: "continuous",
     borderRadius: 12,
@@ -625,7 +630,7 @@ const styles = StyleSheet.create({
   },
   filePill: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.045)",
+    backgroundColor: theme.subtle,
     borderColor: "rgba(132, 145, 165, 0.18)",
     borderCurve: "continuous",
     borderRadius: 6,
@@ -687,7 +692,7 @@ const styles = StyleSheet.create({
     color: folderAccentColor,
   },
   editorFrame: {
-    backgroundColor: "rgba(255, 255, 255, 0.045)",
+    backgroundColor: theme.subtle,
     borderColor: "rgba(132, 145, 165, 0.2)",
     borderCurve: "continuous",
     borderRadius: 8,
@@ -715,7 +720,7 @@ const styles = StyleSheet.create({
   },
   headerActionButton: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.07)",
+    backgroundColor: theme.subtle,
     borderColor: "rgba(132, 145, 165, 0.2)",
     borderCurve: "continuous",
     borderRadius: 7,
@@ -730,12 +735,12 @@ const styles = StyleSheet.create({
     borderColor: "rgba(95, 167, 255, 0.45)",
   },
   headerActionText: {
-    color: Colors.dark.textSecondary,
+    color: theme.textSecondary,
     fontSize: 12,
     lineHeight: 16,
   },
   headerActionTextSelected: {
-    color: Colors.dark.text,
+    color: theme.text,
   },
   editorMetaRow: {
     borderBottomColor: "rgba(132, 145, 165, 0.16)",
@@ -760,7 +765,7 @@ const styles = StyleSheet.create({
     minHeight: 160,
   },
   emptyState: {
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    backgroundColor: theme.subtle,
     borderColor: "rgba(132, 145, 165, 0.2)",
     borderCurve: "continuous",
     borderRadius: 8,
@@ -783,4 +788,4 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.7,
   },
-});
+}));

@@ -95,6 +95,7 @@ function Text({
 const styles = StyleSheet.create({
   base: {
     fontFamily: Fonts.sans,
+    letterSpacing: 0,
   },
 });
 

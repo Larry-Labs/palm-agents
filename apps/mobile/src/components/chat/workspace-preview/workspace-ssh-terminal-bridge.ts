@@ -1,3 +1,4 @@
+import { t } from "../../../i18n";
 import { bridge, createWebView } from "@webview-bridge/react-native";
 
 import type { WorkspaceTerminalOutputResponse } from "codex-relay/api-schema";
@@ -142,7 +143,7 @@ export const workspaceSshTerminalBridge = bridge<WorkspaceSshTerminalBridgeShape
       .get(request.terminalId)
       ?.startSession(request.cols, request.rows);
     if (!response) {
-      throw new Error("Terminal bridge is not ready.");
+      throw new Error(t("Terminal bridge is not ready."));
     }
     return response;
   },

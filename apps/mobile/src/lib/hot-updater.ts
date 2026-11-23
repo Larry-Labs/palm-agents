@@ -1,7 +1,10 @@
 import { HotUpdater, insights, remoteConfig } from "@hot-updater/react-native";
 import Constants from "expo-constants";
 
-export const hotUpdaterBaseUrl = process.env.EXPO_PUBLIC_HOT_UPDATER_BASE_URL?.trim();
+export const hotUpdaterBaseUrl =
+  Constants.expoConfig?.extra?.hotUpdaterEnabled === true
+    ? process.env.EXPO_PUBLIC_HOT_UPDATER_BASE_URL?.trim()
+    : undefined;
 
 const hotUpdaterApiKey =
   process.env.EXPO_PUBLIC_HOT_UPDATER_API_KEY?.trim() ||

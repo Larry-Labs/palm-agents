@@ -2,6 +2,7 @@ import type { CodexModel, ReasoningEffort, RuntimeMode } from "codex-relay/api-s
 import { useState } from "react";
 
 import { hapticSelection } from "@/lib/haptics";
+import { useTheme } from "@/hooks/use-theme";
 
 import { ChatControlRail } from "./ChatControlRail";
 import { ChatModelPickerSheet } from "./ChatModelPickerSheet";
@@ -34,6 +35,7 @@ export function ChatControls({
   selectedReasoningEffort?: ReasoningEffort;
   selectedServiceTier?: string;
 }) {
+  const theme = useTheme();
   const [activePicker, setActivePicker] = useState<"model" | "runtime" | undefined>();
   const activeModel = modelForSelection(models, selectedModel);
   const fastServiceTier = fastServiceTierForModel(activeModel);
@@ -41,7 +43,7 @@ export function ChatControls({
   const effectiveReasoningEffort = activeModel
     ? reasoningEffortForModel(activeModel, selectedReasoningEffort)
     : selectedReasoningEffort;
-  const selectedRuntimeOption = runtimeOptionForMode(runtimeMode);
+  const selectedRuntimeOption = runtimeOptionForMode(runtimeMode, theme.isDark);
   const modelLabel = modelButtonLabel(activeModel, effectiveReasoningEffort, selectedModel);
 
   function closePicker() {

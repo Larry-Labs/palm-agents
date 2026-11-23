@@ -1,3 +1,5 @@
+import { useTheme } from "@/hooks/use-theme";
+import { t } from "../../../i18n";
 import { useQuery } from "@tanstack/react-query";
 import { memo, useCallback, useState } from "react";
 import { ActivityIndicator, RefreshControl, ScrollView, View } from "react-native";
@@ -5,7 +7,7 @@ import { StyleSheet } from "react-native-unistyles";
 
 import { ThemedText } from "@/components/themed-text";
 import { Icon } from "@/components/ui/icon";
-import { Colors, Spacing } from "@/constants/theme";
+import { Spacing } from "@/constants/theme";
 import { getWorkspaceFileContent } from "@/lib/codex-relay-api";
 
 import { HighlightedCodeBlock } from "../MessageBubble";
@@ -19,6 +21,7 @@ export const MarkdownWorkspacePreviewTab = memo(function MarkdownWorkspacePrevie
   target?: WorkspaceMarkdownPreviewTarget;
   workspacePath?: string;
 }) {
+  const theme = useTheme();
   const targetWorkspacePath = target?.workspacePath ?? workspacePath;
   const [isPullRefreshing, setPullRefreshing] = useState(false);
   const fileContentQuery = useQuery({
@@ -54,11 +57,11 @@ export const MarkdownWorkspacePreviewTab = memo(function MarkdownWorkspacePrevie
         contentContainerStyle={styles.content}
         refreshControl={
           <RefreshControl
-            colors={[Colors.dark.text]}
+            colors={[theme.text]}
             enabled={Boolean(target?.path)}
-            progressBackgroundColor={Colors.dark.backgroundElement}
+            progressBackgroundColor={theme.backgroundElement}
             refreshing={isPullRefreshing}
-            tintColor={Colors.dark.text}
+            tintColor={theme.text}
             onRefresh={() => void refreshFromPull()}
           />
         }
@@ -66,44 +69,44 @@ export const MarkdownWorkspacePreviewTab = memo(function MarkdownWorkspacePrevie
       >
         <View style={styles.documentHeader}>
           <View style={styles.documentIcon}>
-            <Icon name="file" size={18} tintColor={Colors.dark.text} />
+            <Icon name="file" size={18} tintColor={theme.text} />
           </View>
           <View style={styles.documentTitleGroup}>
             <ThemedText type="smallBold" style={styles.documentTitle} numberOfLines={1}>
-              {fileContent?.name ?? target?.name ?? "Markdown Preview"}
+              {fileContent?.name ?? target?.name ?? t("Markdown Preview")}
             </ThemedText>
             <ThemedText type="code" themeColor="textSecondary" numberOfLines={1}>
-              {fileContent?.path ?? target?.path ?? "Open a Markdown attachment from chat."}
+              {fileContent?.path ?? target?.path ?? t("Open a Markdown attachment from chat.")}
             </ThemedText>
           </View>
         </View>
 
         {!target?.path ? (
           <View style={styles.emptyState}>
-            <ThemedText type="smallBold">No Markdown file selected</ThemedText>
+            <ThemedText type="smallBold">{t("No Markdown file selected")}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              Open a Markdown document from the chat attachment card.
+              {t("Open a Markdown document from the chat attachment card.")}
             </ThemedText>
           </View>
         ) : fileContentQuery.isLoading ? (
           <View style={styles.loadingRow}>
-            <ActivityIndicator color={Colors.dark.textSecondary} size="small" />
+            <ActivityIndicator color={theme.textSecondary} size="small" />
             <ThemedText type="small" themeColor="textSecondary">
-              Loading Markdown
+              {t("Loading Markdown")}
             </ThemedText>
           </View>
         ) : fileContentQuery.error ? (
           <View style={styles.emptyState}>
-            <ThemedText type="smallBold">Unable to load Markdown</ThemedText>
+            <ThemedText type="smallBold">{t("Unable to load Markdown")}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
               {errorMessage(fileContentQuery.error)}
             </ThemedText>
           </View>
         ) : fileContent?.binary ? (
           <View style={styles.emptyState}>
-            <ThemedText type="smallBold">Binary file</ThemedText>
+            <ThemedText type="smallBold">{t("Binary file")}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              This preview shows text files only.
+              {t("This preview shows text files only.")}
             </ThemedText>
           </View>
         ) : fileContent ? (
@@ -116,7 +119,8 @@ export const MarkdownWorkspacePreviewTab = memo(function MarkdownWorkspacePrevie
             {fileContent.truncated ? (
               <View style={styles.notice}>
                 <ThemedText type="small" themeColor="textSecondary">
-                  Previewing the first {formatBytes(Math.min(fileContent.size, 256 * 1024))}.
+                  {t("Previewing the first")}
+                  {formatBytes(Math.min(fileContent.size, 256 * 1024))}.
                 </ThemedText>
               </View>
             ) : null}
@@ -152,7 +156,7 @@ function formatBytes(bytes: number) {
 }
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Unknown error";
+  return error instanceof Error ? error.message : t("Unknown error");
 }
 
 function languageFromPath(path: string) {
@@ -160,7 +164,7 @@ function languageFromPath(path: string) {
   return extension || "text";
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   contentPane: {
     flex: 1,
     marginHorizontal: Spacing.three,
@@ -172,7 +176,7 @@ const styles = StyleSheet.create({
   },
   documentHeader: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.055)",
+    backgroundColor: theme.subtle,
     borderColor: "rgba(132, 145, 165, 0.2)",
     borderRadius: 8,
     borderWidth: 1,
@@ -182,7 +186,7 @@ const styles = StyleSheet.create({
   },
   documentIcon: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    backgroundColor: theme.subtle,
     borderRadius: 8,
     height: 38,
     justifyContent: "center",
@@ -199,7 +203,7 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    backgroundColor: theme.subtle,
     borderColor: "rgba(132, 145, 165, 0.18)",
     borderRadius: 8,
     borderWidth: 1,
@@ -226,11 +230,11 @@ const styles = StyleSheet.create({
     padding: Spacing.two,
   },
   previewFrame: {
-    backgroundColor: "rgba(255, 255, 255, 0.055)",
+    backgroundColor: theme.subtle,
     borderColor: "rgba(132, 145, 165, 0.2)",
     borderRadius: 8,
     borderWidth: 1,
     gap: Spacing.two,
     padding: Spacing.two,
   },
-});
+}));

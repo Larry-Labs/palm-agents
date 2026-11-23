@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import type { ChatMessage } from "codex-relay/api-schema";
 
 export type TimelinePlanProgressStepStatus = "completed" | "inProgress" | "pending";
@@ -360,7 +361,7 @@ function upsertSubagent(
 
   subagents.set(id, {
     id,
-    label: next.label ?? current?.label ?? `Subagent ${subagents.size + 1}`,
+    label: next.label ?? current?.label ?? t("Subagent {0}", subagents.size + 1),
     status: next.status,
   });
   return true;

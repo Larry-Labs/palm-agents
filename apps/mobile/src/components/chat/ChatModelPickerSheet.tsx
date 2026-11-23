@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import type { CodexModel, ReasoningEffort } from "codex-relay/api-schema";
 import { useEffect, useState } from "react";
 
@@ -87,12 +88,12 @@ export function ChatModelPickerSheet({
 
   return (
     <AppBottomSheet
-      backAccessibilityLabel="Back to Power"
-      title={showAdvanced ? "Advanced" : "Power"}
+      backAccessibilityLabel={t("Back to Power")}
+      title={showAdvanced ? t("Advanced") : t("Power")}
       subtitle={
         showAdvanced
-          ? "Choose the model, reasoning effort, and response speed."
-          : "Balance faster replies with smarter reasoning."
+          ? t("Choose the model, reasoning effort, and response speed.")
+          : t("Balance faster replies with smarter reasoning.")
       }
       enableDynamicSizing={presentation.enableDynamicSizing}
       expandedSnapPercent={presentation.expandedSnapPercent}

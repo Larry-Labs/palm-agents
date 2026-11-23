@@ -1,15 +1,16 @@
+import { t } from "../../i18n";
 import { useSelector } from "@legendapp/state/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Constants from "expo-constants";
-import { router } from "expo-router";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Alert, Linking } from "react-native";
 
 import {
+  checkPairedRelayAddress,
   getCodexRelayServerUrlCandidates,
   getPushNotificationSettings,
   registerPushNotifications,
-  refreshSession,
   setCodexRelayServerUrl,
   signOutCodexRelaySession,
   unregisterPushNotifications,
@@ -26,6 +27,7 @@ import { formatMobileReleaseVersion } from "@/lib/mobile-release-version";
 import {
   defaultPushNotificationPreferences,
   getExpoPushToken,
+  hasExpoPushProject,
   markInitialPushNotificationRegistrationCompleted,
   pushNotificationPlatform,
   supportsPushNotifications,
@@ -34,7 +36,6 @@ import { visibleRateLimitRows } from "@/lib/rate-limits";
 import {
   clearServerState,
   fetchRateLimitsState,
-  fetchStatusState,
   serverStateKeys,
   serverStateQueryFns,
   setStatusState,
@@ -73,7 +74,7 @@ export function useSettingsScreen() {
   const machineName = statusQuery.data?.machineName;
   const computerName = hasPairedSession
     ? (machineName ?? connectedComputerName(serverUrl))
-    : "No paired computer";
+    : t("No paired computer");
   const [appVersion] = useState(
     () => hotUpdater?.getAppVersion() ?? Constants.expoConfig?.version ?? "1.0.0",
   );
@@ -86,6 +87,15 @@ export function useSettingsScreen() {
     getCodexRelayServerUrlCandidates(),
   );
   const [switchingServerUrl, setSwitchingServerUrl] = useState<string | undefined>();
+  const switchingAddress = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      setServerUrlCandidates(getCodexRelayServerUrlCandidates());
+    }, []),
+  );
+  const alternateAddresses = serverUrlCandidates.filter(({ url }) => url !== serverUrl);
+  const manualServerAddresses = alternateAddresses.filter(({ manual }) => manual);
+  const discoveredServerAddresses = alternateAddresses.filter(({ manual }) => !manual);
   const [appUpdate, setAppUpdate] = useState<AppUpdateState>({
     status: "checking",
     updateInfo: null,
@@ -96,6 +106,10 @@ export function useSettingsScreen() {
   const [pushNotificationsLoading, setPushNotificationsLoading] = useState(false);
   const [pushNotificationsUpdating, setPushNotificationsUpdating] = useState(false);
   const pushNotificationsSupported = supportsPushNotifications();
+  const pushNotificationsAvailable = pushNotificationsSupported && hasExpoPushProject();
+  const pushNotificationsUnavailableMessage = pushNotificationsSupported
+    ? t("Push notifications are not configured in this build.")
+    : t("Push notifications are available in the iOS and Android apps.");
   const rateLimitRows = visibleRateLimitRows(rateLimitsQuery.data?.buckets ?? []);
   const isAppUpdatePending =
     appUpdate.status === "downloading" ||
@@ -105,10 +119,10 @@ export function useSettingsScreen() {
     appUpdate.status === "downloading" || appUpdate.status === "updating";
   const appUpdateActionLabel =
     appUpdate.status === "downloading"
-      ? "Downloading"
+      ? t("Downloading")
       : appUpdate.status === "updating"
-        ? "Restarting"
-        : "Restart";
+        ? t("Restarting")
+        : t("Restart");
 
   useEffect(() => {
     let isActive = true;
@@ -179,7 +193,7 @@ export function useSettingsScreen() {
 
   useEffect(() => {
     let isActive = true;
-    if (!hasPairedSession || !pushNotificationsSupported) {
+    if (!hasPairedSession || !pushNotificationsAvailable) {
       setPushNotificationPreferences(defaultPushNotificationPreferences);
       setPushNotificationsLoading(false);
       return () => {
@@ -208,7 +222,7 @@ export function useSettingsScreen() {
     return () => {
       isActive = false;
     };
-  }, [hasPairedSession, pushNotificationsSupported, serverUrl]);
+  }, [hasPairedSession, pushNotificationsAvailable, serverUrl]);
 
   function closeSettings() {
     hapticSelection();
@@ -231,7 +245,7 @@ export function useSettingsScreen() {
     preference: PushNotificationPreference,
     value: boolean,
   ) {
-    if (pushNotificationsUpdating || !pushNotificationsSupported) {
+    if (pushNotificationsUpdating || !pushNotificationsAvailable) {
       return;
     }
 
@@ -254,40 +268,47 @@ export function useSettingsScreen() {
     } catch (caught) {
       setPushNotificationPreferences(previousPreferences);
       hapticWarning();
-      Alert.alert("Notifications unavailable", settingsErrorMessage(caught));
+      Alert.alert(t("Notifications unavailable"), settingsErrorMessage(caught));
     } finally {
       setPushNotificationsUpdating(false);
     }
   }
 
   async function selectServerAddress(candidate: CodexRelayServerUrlCandidate) {
-    if (candidate.url === serverUrl || switchingServerUrl) {
+    if (candidate.url === serverUrl || switchingAddress.current) {
       return;
     }
 
     hapticSelection();
+    switchingAddress.current = true;
     setSwitchingServerUrl(candidate.url);
-    const normalizedServerUrl = setCodexRelayServerUrl(candidate.url);
-    setServerUrl(normalizedServerUrl);
-    setServerUrlCandidates(getCodexRelayServerUrlCandidates());
-    clearServerState(queryClient);
-    setConnection("checking");
 
     try {
-      await refreshSession().catch(() => false);
-      const [status] = await Promise.all([
-        fetchStatusState(queryClient),
-        fetchRateLimitsState(queryClient).catch(() => undefined),
-      ]);
+      const status = await checkPairedRelayAddress(candidate);
+      if (chatStore$.serverUrl.peek() !== serverUrl || !chatStore$.hasPairedSession.peek()) {
+        return;
+      }
+      const normalizedServerUrl = setCodexRelayServerUrl(candidate.url);
+      clearServerState(queryClient);
+      setServerUrl(normalizedServerUrl);
       setStatusState(queryClient, status);
       setConnection("connected");
+      void fetchRateLimitsState(queryClient).catch(() => undefined);
     } catch (caught) {
       const message = settingsErrorMessage(caught);
-      setConnection("offline", message);
-      Alert.alert("Server unavailable", message);
+      Alert.alert(t("Server unavailable"), message);
     } finally {
+      switchingAddress.current = false;
       setSwitchingServerUrl(undefined);
     }
+  }
+
+  function addServerAddress() {
+    router.push("/relay-address");
+  }
+
+  function editServerAddress(address: string) {
+    router.push({ pathname: "/relay-address", params: { edit: address } });
   }
 
   async function applyAppUpdate() {
@@ -329,6 +350,7 @@ export function useSettingsScreen() {
   }
 
   return {
+    addServerAddress,
     appUpdate,
     appUpdateActionLabel,
     appliedBundleSuffix,
@@ -336,14 +358,18 @@ export function useSettingsScreen() {
     closeSettings,
     computerName,
     connection,
+    discoveredServerAddresses,
+    editServerAddress,
     hasPairedSession,
     hotUpdaterLogs,
     isAppUpdateActionDisabled,
     isAppUpdatePending,
+    manualServerAddresses,
     openProjectLink,
     pushNotificationPreferences,
     pushNotificationsLoading,
-    pushNotificationsSupported,
+    pushNotificationsAvailable,
+    pushNotificationsUnavailableMessage,
     pushNotificationsUpdating,
     rateLimitRows,
     rateLimitsFetching: rateLimitsQuery.isFetching,
@@ -351,7 +377,6 @@ export function useSettingsScreen() {
     revealHotUpdaterLogs,
     selectServerAddress,
     serverUrl,
-    serverUrlCandidates,
     setShowHotUpdaterLogs,
     showHotUpdaterLogs,
     signOut,
@@ -397,17 +422,17 @@ export function useRemoteConfigPanel(remoteConfig: HotUpdaterRemoteConfig) {
 }
 
 export function compactServer(serverUrl: string) {
-  return serverUrl ? serverUrl.replace(/^https?:\/\//, "") : "Not paired";
+  return serverUrl ? serverUrl.replace(/^https?:\/\//, "") : t("Not paired");
 }
 
 export function connectionLabel(connection: SettingsConnection) {
   switch (connection) {
     case "connected":
-      return "ONLINE";
+      return "已连接";
     case "checking":
-      return "CHECKING";
+      return "检查中";
     case "offline":
-      return "OFFLINE";
+      return "未连接";
   }
 }
 
@@ -428,15 +453,15 @@ export function rateLimitProgressColor(remainingPercent: number) {
 export function appUpdateStatusSuffix(status: AppUpdateState["status"]) {
   switch (status) {
     case "checking":
-      return "checking";
+      return "正在检查更新";
     case "current":
-      return "current";
+      return "当前版本";
     case "downloading":
-      return "downloading";
+      return "正在下载";
     case "ready":
-      return "restart ready";
+      return "重启后生效";
     case "error":
-      return "check failed";
+      return "检查更新失败";
     case "updating":
       return undefined;
   }
@@ -444,7 +469,7 @@ export function appUpdateStatusSuffix(status: AppUpdateState["status"]) {
 
 function connectedComputerName(serverUrl: string) {
   if (!serverUrl) {
-    return "No computer paired";
+    return t("No computer paired");
   }
   try {
     return new URL(serverUrl).hostname;
@@ -457,7 +482,7 @@ function settingsErrorMessage(error: unknown) {
   if (error instanceof Error && error.message) {
     return error.message;
   }
-  return "Could not reach the selected server address.";
+  return t("Could not reach the selected server address.");
 }
 
 function appliedHotUpdateBundleSuffix() {

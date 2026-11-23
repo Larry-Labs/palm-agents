@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import type { CodexModel, ReasoningEffort } from "codex-relay/api-schema";
 
 import { SheetActionRow, SheetSelectedDot } from "@/components/ui/bottom-sheet";
@@ -42,7 +43,7 @@ export function AdvancedModelOptions({
   );
   const speedOptions = speedDisplayOptions(activeModel, selectedServiceTier);
   const speedLabel =
-    speedOptions.find((option) => option.value === selectedServiceTier)?.label ?? "Standard";
+    speedOptions.find((option) => option.value === selectedServiceTier)?.label ?? t("Standard");
 
   function toggleSection(section: AdvancedSection) {
     onSectionChange(activeSection === section ? undefined : section);
@@ -52,7 +53,7 @@ export function AdvancedModelOptions({
     <>
       <AdvancedSummaryRow
         expanded={activeSection === "model"}
-        label="Model"
+        label={t("Model")}
         onPress={() => toggleSection("model")}
         value={shortModelLabel(activeModel, selectedModel)}
       />
@@ -62,7 +63,7 @@ export function AdvancedModelOptions({
             return (
               <SheetActionRow
                 key={model.model}
-                accessibilityLabel={`Model ${model.displayName}`}
+                accessibilityLabel={t("Model {0}", model.displayName)}
                 icon="model"
                 onPress={() =>
                   onModelSelect(
@@ -82,9 +83,9 @@ export function AdvancedModelOptions({
 
       <AdvancedSummaryRow
         expanded={activeSection === "effort"}
-        label="Effort"
+        label={t("Effort")}
         onPress={() => toggleSection("effort")}
-        value={selectedReasoningEffort ? reasoningTitle(selectedReasoningEffort) : "Default"}
+        value={selectedReasoningEffort ? reasoningTitle(selectedReasoningEffort) : t("Default")}
       />
       {activeSection === "effort" && reasoningOptions.length > 0 ? (
         <>
@@ -93,7 +94,7 @@ export function AdvancedModelOptions({
             return (
               <SheetActionRow
                 key={option.value}
-                accessibilityLabel={`Effort ${option.label}`}
+                accessibilityLabel={t("Effort {0}", option.label)}
                 icon="controls"
                 onPress={() => onReasoningSelect(option.value)}
                 selected={selected}
@@ -109,7 +110,7 @@ export function AdvancedModelOptions({
 
       <AdvancedSummaryRow
         expanded={activeSection === "speed"}
-        label="Speed"
+        label={t("Speed")}
         onPress={() => toggleSection("speed")}
         value={speedLabel}
       />
@@ -119,7 +120,7 @@ export function AdvancedModelOptions({
             return (
               <SheetActionRow
                 key={option.value ?? "standard"}
-                accessibilityLabel={`Speed ${option.label}`}
+                accessibilityLabel={t("Speed {0}", option.label)}
                 icon={option.value ? "fast" : "controls"}
                 iconBackgroundColor={option.value ? "rgba(255, 214, 102, 0.11)" : undefined}
                 iconTintColor={option.value ? "rgba(255, 214, 102, 0.88)" : undefined}

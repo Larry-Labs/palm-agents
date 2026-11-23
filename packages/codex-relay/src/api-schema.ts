@@ -1,3 +1,7 @@
+import { hkdf } from "@noble/hashes/hkdf.js";
+import { hmac } from "@noble/hashes/hmac.js";
+import { sha256 } from "@noble/hashes/sha2.js";
+import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import { z } from "zod";
 
 export const IsoDateTimeSchema = z.string().datetime();
@@ -556,6 +560,30 @@ export const PairResponseSchema = z.object({
     .optional(),
 });
 
+const relayAddressProofHex = z.string().regex(/^[0-9a-f]{64}$/);
+export const RelayAddressVerificationRequestSchema = z.object({
+  clientSessionId: z.string().min(1).max(120),
+  challenge: relayAddressProofHex,
+  proof: relayAddressProofHex,
+});
+
+export const RelayAddressVerificationResponseSchema = z.object({
+  proof: relayAddressProofHex,
+});
+
+export function relayAddressProof(
+  key: Uint8Array,
+  sender: "mobile" | "server",
+  clientSessionId: string,
+  origin: string,
+  challenge: string,
+) {
+  const purpose = utf8ToBytes("palm-agents-relay-address-v1");
+  const proofKey = hkdf(sha256, key, undefined, purpose, 32);
+  const message = utf8ToBytes(JSON.stringify([sender, clientSessionId, origin, challenge]));
+  return bytesToHex(hmac(sha256, proofKey, message));
+}
+
 export const EncryptedPayloadSchema = z.object({
   ciphertext: z.string().min(1),
   counter: z.number().int().nonnegative(),
@@ -1089,6 +1117,7 @@ export const apiPaths = {
   pairApprove: "/v1/pair/approve",
   sessionsClear: "/v1/sessions/clear",
   sessionRefresh: "/v1/session/refresh",
+  relayAddressVerify: "/v1/relay/address/verify",
   status: "/v1/status",
   preferences: "/v1/preferences",
   pushNotifications: "/v1/notifications/push",

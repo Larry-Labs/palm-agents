@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useEffect } from "react";
 import { Pressable } from "react-native";
 import Animated, {
@@ -46,8 +47,8 @@ export function FastToggle({
 
   return (
     <Pressable
-      accessibilityHint="1.5x speed, more usage"
-      accessibilityLabel="Fast"
+      accessibilityHint={t("1.5x speed, more usage")}
+      accessibilityLabel={t("Fast")}
       accessibilityRole="switch"
       accessibilityState={{ checked: enabled }}
       onPress={() => {
@@ -63,7 +64,7 @@ export function FastToggle({
         tintColor={enabled ? theme.powerBlue : theme.textSecondary}
       />
       <Text style={[styles.label, { color: enabled ? theme.text : theme.textSecondaryStrong }]}>
-        Fast
+        {t("Fast")}
       </Text>
       <Animated.View style={[styles.track, trackStyle]}>
         <Animated.View style={[styles.thumb, { backgroundColor: theme.text }, thumbStyle]} />

@@ -52,7 +52,7 @@ const color = {
   prompt: colors.cyan,
   url: colors.blue,
 };
-const npxCommand = "npx codex-relay@latest";
+const npxCommand = "npx @larry-labs/palm-agents-relay@latest";
 
 const sessionStore = await createTursoPairingSessionStore(
   process.env.CODEX_RELAY_AUTH_DB_PATH ??

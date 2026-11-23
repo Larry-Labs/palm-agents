@@ -8,8 +8,7 @@
       "node": "24.14.1",
       "environment": "development",
       "env": {
-        "SHARP_IGNORE_GLOBAL_LIBVIPS": "1",
-        "EXPO_PUBLIC_HOT_UPDATER_BASE_URL": "https://codex-relay-ota-rc22.gron1gh1.workers.dev"
+        "SHARP_IGNORE_GLOBAL_LIBVIPS": "1"
       },
       "developmentClient": true,
       "distribution": "internal",
@@ -21,8 +20,7 @@
       "node": "24.14.1",
       "environment": "preview",
       "env": {
-        "SHARP_IGNORE_GLOBAL_LIBVIPS": "1",
-        "EXPO_PUBLIC_HOT_UPDATER_BASE_URL": "https://codex-relay-ota-rc22.gron1gh1.workers.dev"
+        "SHARP_IGNORE_GLOBAL_LIBVIPS": "1"
       },
       "distribution": "internal",
       "ios": {
@@ -33,8 +31,7 @@
       "node": "24.14.1",
       "environment": "production",
       "env": {
-        "SHARP_IGNORE_GLOBAL_LIBVIPS": "1",
-        "EXPO_PUBLIC_HOT_UPDATER_BASE_URL": "https://codex-relay-ota-rc22.gron1gh1.workers.dev"
+        "SHARP_IGNORE_GLOBAL_LIBVIPS": "1"
       },
       "autoIncrement": true,
       "distribution": "store",
@@ -53,10 +50,6 @@
     }
   },
   "submit": {
-    "production": {
-      "ios": {
-        "ascAppId": "6764463488"
-      }
-    }
+    "production": {}
   }
 }

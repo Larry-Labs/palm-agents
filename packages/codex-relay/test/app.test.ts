@@ -4484,6 +4484,97 @@ describe("Codex Relay server routes", () => {
     );
   });
 
+  it.each([undefined, "on-failure"])(
+    "starts auto-mode turns with a supported approval policy (override: %s)",
+    async (approvalPolicy) => {
+      const workspacePath = await mkdtemp(join(tmpdir(), "codex-relay-auto-mode-"));
+      const handlers = new Set<(notification: unknown) => void>();
+      const appThread = {
+        id: "auto-mode-thread",
+        createdAt: Date.now() / 1000,
+        updatedAt: Date.now() / 1000,
+        cwd: workspacePath,
+        name: "Auto mode",
+        preview: "Auto mode",
+        source: "app",
+        status: "idle",
+        modelProvider: "openai",
+        turns: [],
+      };
+      const startThread = vi.fn<(options: { approvalPolicy?: string }) => Promise<unknown>>(
+        async (options) => {
+          if (options.approvalPolicy === "on-failure") throw new Error("Removed approval policy");
+          return appThread;
+        },
+      );
+      const startTurn = vi.fn<(options: { approvalPolicy?: string }) => Promise<unknown>>(
+        async (options) => {
+          if (options.approvalPolicy === "on-failure") throw new Error("Removed approval policy");
+          queueMicrotask(() => {
+            for (const handler of handlers) {
+              handler({
+                method: "turn/completed",
+                params: {
+                  threadId: appThread.id,
+                  turnId: "auto-turn",
+                  status: "completed",
+                },
+              });
+            }
+          });
+          return {
+            id: "auto-turn",
+            items: [],
+            status: "running",
+            startedAt: null,
+            completedAt: null,
+          };
+        },
+      );
+      const app = createApp({
+        workspacePath,
+        codex: createMockCodex(),
+        appServer: {
+          onNotification(handler: (notification: unknown) => void) {
+            handlers.add(handler);
+            return () => handlers.delete(handler);
+          },
+          onRequest() {
+            return () => undefined;
+          },
+          listThreads: async () => [appThread],
+          startThread,
+          startTurn,
+        } as never,
+      });
+      const created = await app.request("/v1/threads", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title: "Auto mode", runtimeMode: "auto", approvalPolicy }),
+      });
+      expect(created.status).toBe(201);
+      const response = await app.request(`/v1/threads/${appThread.id}/runs/stream`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ prompt: "Continue", runtimeMode: "auto", approvalPolicy }),
+      });
+      await response.text();
+      expect(response.status).toBe(200);
+      expect(startThread).toHaveBeenCalledWith(
+        expect.objectContaining({
+          approvalPolicy: "on-request",
+          sandbox: "workspace-write",
+        }),
+      );
+      expect(startTurn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          approvalPolicy: "on-request",
+          sandboxPolicy: expect.objectContaining({ type: "workspaceWrite" }),
+        }),
+      );
+    },
+  );
+
   it("preserves app-server thread runtime metadata selected from mobile across refreshes", async () => {
     const workspacePath = await mkdtemp(join(tmpdir(), "codex-relay-workspace-"));
     const notificationHandlers = new Set<(notification: unknown) => void>();

@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import {
   Button,
   DisclosureGroup,
@@ -15,6 +16,8 @@ import {
   VStack,
 } from "@expo/ui/swift-ui";
 import {
+  accessibilityLabel,
+  buttonStyle,
   disabled,
   font,
   foregroundStyle,
@@ -24,13 +27,15 @@ import {
   scrollContentBackground,
   tint,
 } from "@expo/ui/swift-ui/modifiers";
-import { Pressable, StyleSheet, View } from "react-native";
+import { useState } from "react";
+import { Pressable, View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
+import { useTheme } from "@/hooks/use-theme";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
   appUpdateStatusSuffix,
   clampPercent,
-  compactServer,
   connectionLabel,
   rateLimitProgressColor,
   useRemoteConfigPanel,
@@ -39,26 +44,23 @@ import {
 } from "@/components/settings/use-settings-screen";
 import { ThemedText } from "@/components/themed-text";
 import { Icon } from "@/components/ui/icon";
-import {
-  codexRelayRepositoryLabel,
-  codexRelayRepositoryUrl,
-  codexRelaySponsorLabel,
-  codexRelaySponsorUrl,
-} from "@/constants/links";
-import { Colors, MaxContentWidth } from "@/constants/theme";
+import { codexRelayRepositoryLabel, codexRelayRepositoryUrl } from "@/constants/links";
+import { MaxContentWidth } from "@/constants/theme";
 import { hotUpdater, hotUpdaterBaseUrl } from "@/lib/hot-updater";
 import { clearHotUpdaterLogs, formatHotUpdaterLogTime } from "@/lib/hot-updater-logs";
 import { formatRateLimitRemaining } from "@/lib/rate-limits";
 
-const ROW_BACKGROUND = "#202222";
 const secondaryText = [foregroundStyle("secondary")];
 const footnote = [font({ textStyle: "footnote" }), foregroundStyle("secondary")];
 const monospaced = [font({ textStyle: "footnote", design: "monospaced" })];
 
 // Native SwiftUI Form; the hook owns every piece of state and every action.
 export function SettingsScreen() {
+  const theme = useTheme();
+  const [showDiscoveredAddresses, setShowDiscoveredAddresses] = useState(false);
   const settings = useSettingsScreen();
   const {
+    addServerAddress,
     appUpdate,
     appUpdateActionLabel,
     appliedBundleSuffix,
@@ -66,13 +68,17 @@ export function SettingsScreen() {
     closeSettings,
     computerName,
     connection,
+    discoveredServerAddresses,
+    editServerAddress,
     hasPairedSession,
     isAppUpdateActionDisabled,
     isAppUpdatePending,
+    manualServerAddresses,
     openProjectLink,
     pushNotificationPreferences,
     pushNotificationsLoading,
-    pushNotificationsSupported,
+    pushNotificationsAvailable,
+    pushNotificationsUnavailableMessage,
     pushNotificationsUpdating,
     rateLimitRows,
     rateLimitsFetching,
@@ -80,15 +86,50 @@ export function SettingsScreen() {
     revealHotUpdaterLogs,
     selectServerAddress,
     serverUrl,
-    serverUrlCandidates,
     signOut,
     switchingServerUrl,
     updatePushNotificationPreference,
   } = settings;
+  function renderAddress(candidate: Parameters<typeof selectServerAddress>[0]) {
+    const switchButton = (
+      <Button
+        onPress={() => void selectServerAddress(candidate)}
+        modifiers={[buttonStyle("borderless"), disabled(Boolean(switchingServerUrl))]}
+      >
+        <HStack spacing={10}>
+          <VStack alignment="leading" spacing={2}>
+            <Text modifiers={[foregroundStyle("primary")]}>{candidate.label}</Text>
+            <Text modifiers={footnote}>{candidate.url}</Text>
+          </VStack>
+          <Spacer />
+          {switchingServerUrl === candidate.url ? (
+            <Text modifiers={footnote}>{t("Checking")}</Text>
+          ) : null}
+        </HStack>
+      </Button>
+    );
+    return (
+      <HStack key={candidate.url} spacing={12}>
+        {switchButton}
+        {candidate.manual ? (
+          <Button
+            label={t("Edit address")}
+            onPress={() => editServerAddress(candidate.url)}
+            modifiers={[
+              accessibilityLabel(t("Edit address {0}", candidate.url)),
+              buttonStyle("borderless"),
+              disabled(Boolean(switchingServerUrl)),
+            ]}
+          />
+        ) : null}
+      </HStack>
+    );
+  }
+
   const notificationsDisabled = pushNotificationsLoading || pushNotificationsUpdating;
   const updateSuffix = appUpdateStatusSuffix(appUpdate.status);
   const versionLine = [
-    `Version ${releaseVersionLabel}`,
+    t("Version {0}", releaseVersionLabel),
     updateSuffix,
     appliedBundleSuffix ? `bundle ${appliedBundleSuffix}` : undefined,
   ]
@@ -101,69 +142,30 @@ export function SettingsScreen() {
         <View style={styles.header}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Back to threads"
+            accessibilityLabel={t("Back to threads")}
             hitSlop={8}
             onPress={closeSettings}
             style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}
           >
-            <Icon name="back" size={19} tintColor={Colors.dark.text} />
+            <Icon name="back" size={19} tintColor={theme.text} />
           </Pressable>
           <ThemedText type="subtitle" style={styles.title}>
-            Settings
+            {t("Settings")}
           </ThemedText>
           <View style={styles.headerButton} />
         </View>
-        <Host colorScheme="dark" style={styles.host}>
+        <Host colorScheme={theme.isDark ? "dark" : "light"} style={styles.host}>
           <Form modifiers={[scrollContentBackground("hidden")]}>
-            <Section title="Project" modifiers={[listRowBackground(ROW_BACKGROUND)]}>
-              <Button onPress={() => openProjectLink(codexRelayRepositoryUrl)}>
-                <LabeledContent
-                  label={
-                    <Label title="GitHub" systemImage="chevron.left.forwardslash.chevron.right" />
-                  }
-                >
-                  <Text modifiers={footnote}>{codexRelayRepositoryLabel}</Text>
-                </LabeledContent>
-              </Button>
-              <Button onPress={() => openProjectLink(codexRelaySponsorUrl)}>
-                <LabeledContent
-                  label={<Label title="Sponsor" systemImage="heart.fill" color="#FF9FC0" />}
-                >
-                  <Text modifiers={footnote}>{codexRelaySponsorLabel}</Text>
-                </LabeledContent>
-              </Button>
-            </Section>
-
-            <Section title="Usage Limits" modifiers={[listRowBackground(ROW_BACKGROUND)]}>
-              {rateLimitRows.length > 0 ? (
-                rateLimitRows.map((row) => (
-                  <RateLimitGauge
-                    key={row.id}
-                    label={row.label}
-                    remainingPercent={row.window.remainingPercent}
-                    remainingText={formatRateLimitRemaining(row.window)}
-                    usedPercent={row.window.usedPercent}
-                  />
-                ))
-              ) : (
-                <LabeledContent label="Rate limits">
-                  <Text modifiers={secondaryText}>
-                    {rateLimitsFetching
-                      ? "Checking current usage"
-                      : "Unavailable from this runtime"}
-                  </Text>
-                </LabeledContent>
-              )}
-            </Section>
-
             <Section
-              title="Connected Computer"
+              title={t("Relay connection")}
               footer={
                 hasPairedSession ? undefined : (
-                  <Text>Pair this device from the main screen to choose a relay server.</Text>
+                  <Text>
+                    {t("Pair this device from the main screen to choose a relay server.")}
+                  </Text>
                 )
               }
-              modifiers={[listRowBackground(ROW_BACKGROUND)]}
+              modifiers={[listRowBackground(theme.surface)]}
             >
               <LabeledContent label={<Label title={computerName} systemImage="desktopcomputer" />}>
                 <HStack spacing={6}>
@@ -175,62 +177,84 @@ export function SettingsScreen() {
                         ? "#2CA36F"
                         : connection === "offline"
                           ? "#FF9B8D"
-                          : "#9A9A9A"
+                          : theme.textSecondary
                     }
                   />
                   <Text modifiers={monospaced}>{connectionLabel(connection)}</Text>
                 </HStack>
               </LabeledContent>
               {hasPairedSession ? (
-                <LabeledContent label="Server">
-                  <Text modifiers={[...monospaced, foregroundStyle("secondary")]}>
-                    {compactServer(serverUrl)}
+                <>
+                  <HStack spacing={12}>
+                    <VStack alignment="leading" spacing={2}>
+                      <Text>{t("Current connection address")}</Text>
+                      <Text modifiers={footnote}>{serverUrl}</Text>
+                    </VStack>
+                    <Spacer />
+                    <Button
+                      label={t("Edit address")}
+                      onPress={() => editServerAddress(serverUrl)}
+                      modifiers={[
+                        accessibilityLabel(t("Edit address {0}", serverUrl)),
+                        buttonStyle("borderless"),
+                        disabled(Boolean(switchingServerUrl)),
+                      ]}
+                    />
+                  </HStack>
+                  <Button
+                    label={t("Add connection address")}
+                    onPress={addServerAddress}
+                    modifiers={[disabled(Boolean(switchingServerUrl))]}
+                  />
+                  {manualServerAddresses.map(renderAddress)}
+                  {discoveredServerAddresses.length > 0 ? (
+                    <DisclosureGroup
+                      isExpanded={showDiscoveredAddresses}
+                      label={t("Other addresses")}
+                      onIsExpandedChange={setShowDiscoveredAddresses}
+                    >
+                      {discoveredServerAddresses.map(renderAddress)}
+                    </DisclosureGroup>
+                  ) : null}
+                </>
+              ) : null}
+            </Section>
+
+            <Section title={t("Usage Limits")} modifiers={[listRowBackground(theme.surface)]}>
+              {rateLimitRows.length > 0 ? (
+                rateLimitRows.map((row) => (
+                  <RateLimitGauge
+                    key={row.id}
+                    label={row.label}
+                    remainingPercent={row.window.remainingPercent}
+                    remainingText={formatRateLimitRemaining(row.window)}
+                    usedPercent={row.window.usedPercent}
+                  />
+                ))
+              ) : (
+                <LabeledContent label={t("Rate limits")}>
+                  <Text modifiers={secondaryText}>
+                    {rateLimitsFetching
+                      ? t("Checking current usage")
+                      : t("Unavailable from this runtime")}
                   </Text>
                 </LabeledContent>
-              ) : null}
-              {hasPairedSession
-                ? serverUrlCandidates.map((candidate) => {
-                    const isSelected = candidate.url === serverUrl;
-                    const isSwitching = switchingServerUrl === candidate.url;
-                    return (
-                      <Button
-                        key={candidate.url}
-                        onPress={() => void selectServerAddress(candidate)}
-                        modifiers={[disabled(isSelected || Boolean(switchingServerUrl))]}
-                      >
-                        <HStack spacing={10}>
-                          <VStack alignment="leading" spacing={2}>
-                            <Text modifiers={[foregroundStyle("primary")]}>{candidate.label}</Text>
-                            <Text modifiers={[...monospaced, foregroundStyle("secondary")]}>
-                              {compactServer(candidate.url)}
-                            </Text>
-                          </VStack>
-                          <Spacer />
-                          {isSwitching ? (
-                            <Text modifiers={footnote}>Checking</Text>
-                          ) : isSelected ? (
-                            <Image systemName="checkmark" size={15} color="#93E1B6" />
-                          ) : null}
-                        </HStack>
-                      </Button>
-                    );
-                  })
-                : null}
+              )}
             </Section>
 
             {hasPairedSession ? (
               <Section
-                title="Notifications"
+                title={t("Notifications")}
                 footer={
-                  <Text>
-                    {pushNotificationsSupported
-                      ? "Generic alerts only. Chat content stays on your paired computer."
-                      : "Push notifications are available in the iOS and Android apps."}
-                  </Text>
+                  pushNotificationsAvailable ? (
+                    <Text>
+                      {t("Generic alerts only. Chat content stays on your paired computer.")}
+                    </Text>
+                  ) : undefined
                 }
-                modifiers={[listRowBackground(ROW_BACKGROUND)]}
+                modifiers={[listRowBackground(theme.surface)]}
               >
-                {pushNotificationsSupported ? (
+                {pushNotificationsAvailable ? (
                   <>
                     <NotificationToggle
                       disabled={notificationsDisabled}
@@ -238,8 +262,8 @@ export function SettingsScreen() {
                       onChange={(value) =>
                         void updatePushNotificationPreference("turnTerminal", value)
                       }
-                      subtitle="When Codex completes or fails a turn"
-                      title="Turn complete"
+                      subtitle={t("When Codex completes or fails a turn")}
+                      title={t("Turn complete")}
                     />
                     <NotificationToggle
                       disabled={notificationsDisabled}
@@ -247,8 +271,8 @@ export function SettingsScreen() {
                       onChange={(value) =>
                         void updatePushNotificationPreference("includeRemainingUsage", value)
                       }
-                      subtitle="Show the lowest remaining Codex limit after a turn"
-                      title="Remaining usage"
+                      subtitle={t("Show the lowest remaining Codex limit after a turn")}
+                      title={t("Remaining usage")}
                     />
                     <NotificationToggle
                       disabled={notificationsDisabled}
@@ -256,18 +280,20 @@ export function SettingsScreen() {
                       onChange={(value) =>
                         void updatePushNotificationPreference("actionRequired", value)
                       }
-                      subtitle="When Codex needs approval or input"
-                      title="Action required"
+                      subtitle={t("When Codex needs approval or input")}
+                      title={t("Action required")}
                     />
                   </>
-                ) : null}
+                ) : (
+                  <Text modifiers={secondaryText}>{pushNotificationsUnavailableMessage}</Text>
+                )}
               </Section>
             ) : null}
 
             {hasPairedSession ? (
-              <Section title="Session" modifiers={[listRowBackground(ROW_BACKGROUND)]}>
+              <Section title={t("Session")} modifiers={[listRowBackground(theme.surface)]}>
                 <Button
-                  label="Sign out"
+                  label={t("Sign out")}
                   systemImage="rectangle.portrait.and.arrow.right"
                   // eslint-disable-next-line jsx-a11y/aria-role -- SwiftUI button role, not ARIA
                   role="destructive"
@@ -277,7 +303,7 @@ export function SettingsScreen() {
             ) : null}
 
             <Section
-              modifiers={[listRowBackground(ROW_BACKGROUND)]}
+              modifiers={[listRowBackground(theme.surface)]}
               footer={
                 isAppUpdatePending && appUpdate.updateInfo?.message ? (
                   <Text>{appUpdate.updateInfo.message}</Text>
@@ -288,7 +314,7 @@ export function SettingsScreen() {
                 <Image
                   systemName={isAppUpdatePending ? "arrow.triangle.2.circlepath" : "checkmark.seal"}
                   size={13}
-                  color={isAppUpdatePending ? "#93E1B6" : "#9A9A9A"}
+                  color={isAppUpdatePending ? "#93E1B6" : theme.textSecondary}
                 />
                 <Text modifiers={[...monospaced, onTapGesture(revealHotUpdaterLogs)]}>
                   {versionLine}
@@ -308,6 +334,18 @@ export function SettingsScreen() {
                   onHide={() => settings.setShowHotUpdaterLogs(false)}
                 />
               ) : null}
+            </Section>
+
+            <Section title={t("Project")} modifiers={[listRowBackground(theme.surface)]}>
+              <Button onPress={() => openProjectLink(codexRelayRepositoryUrl)}>
+                <LabeledContent
+                  label={
+                    <Label title="GitHub" systemImage="chevron.left.forwardslash.chevron.right" />
+                  }
+                >
+                  <Text modifiers={footnote}>{codexRelayRepositoryLabel}</Text>
+                </LabeledContent>
+              </Button>
             </Section>
           </Form>
         </Host>
@@ -343,9 +381,14 @@ function RateLimitGauge({
         modifiers={[gaugeStyle("linearCapacity"), tint(rateLimitProgressColor(remaining))]}
       />
       <HStack>
-        <Text modifiers={footnote}>{remainingText} left</Text>
+        <Text modifiers={footnote}>
+          {remainingText} {t("left")}
+        </Text>
         <Spacer />
-        <Text modifiers={footnote}>Used {used}%</Text>
+        <Text modifiers={footnote}>
+          {t("Used")}
+          {used}%
+        </Text>
       </HStack>
     </VStack>
   );
@@ -383,12 +426,12 @@ function HotUpdaterLogs({
   onHide: () => void;
 }) {
   return (
-    <DisclosureGroup label={`Logs (${hotUpdater?.getCohort() ?? "none"})`} isExpanded>
+    <DisclosureGroup label={t("Logs ({0})", hotUpdater?.getCohort() ?? "none")} isExpanded>
       <HStack spacing={12}>
-        <Button label="Clear" onPress={clearHotUpdaterLogs} />
-        <Button label="Hide" onPress={onHide} />
+        <Button label={t("Clear")} onPress={clearHotUpdaterLogs} />
+        <Button label={t("Hide")} onPress={onHide} />
       </HStack>
-      <LabeledContent label="Base URL">
+      <LabeledContent label={t("Base URL")}>
         <Text modifiers={[...monospaced, foregroundStyle(hotUpdaterBaseUrl ? "primary" : "red")]}>
           {hotUpdaterBaseUrl ? "configured" : "missing"}
         </Text>
@@ -407,7 +450,7 @@ function HotUpdaterLogs({
           </VStack>
         ))
       ) : (
-        <Text modifiers={footnote}>No OTA download events captured in this session.</Text>
+        <Text modifiers={footnote}>{t("No OTA download events captured in this session.")}</Text>
       )}
     </DisclosureGroup>
   );
@@ -421,7 +464,7 @@ function RemoteConfigRows({ remoteConfig }: { remoteConfig: HotUpdaterRemoteConf
         <Text>Remote Config v{remoteConfig.activeVersion}</Text>
         <Spacer />
         <Button
-          label={fetching ? "Fetching" : "Fetch"}
+          label={fetching ? t("Fetching") : t("Fetch")}
           onPress={() => void fetchNow()}
           modifiers={[disabled(fetching)]}
         />
@@ -442,10 +485,10 @@ function RemoteConfigRows({ remoteConfig }: { remoteConfig: HotUpdaterRemoteConf
   );
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   screen: {
     alignItems: "center",
-    backgroundColor: Colors.dark.background,
+    backgroundColor: theme.background,
     flex: 1,
   },
   container: {
@@ -467,7 +510,7 @@ const styles = StyleSheet.create({
     width: 36,
   },
   title: {
-    color: Colors.dark.text,
+    color: theme.text,
   },
   pressed: {
     opacity: 0.6,
@@ -475,4 +518,4 @@ const styles = StyleSheet.create({
   host: {
     flex: 1,
   },
-});
+}));

@@ -213,6 +213,223 @@ describe("mobile stream contract", () => {
     expect(messages.find((message) => message.role === "assistant")?.state).toBe("completed");
   });
 
+  it.each([
+    ["run", true],
+    ["run", false],
+    ["attach", true],
+    ["attach", false],
+  ] as const)(
+    "follows Codex activity in a mobile %s stream and history (terminal items: %s)",
+    async (mode, hasTerminalItems) => {
+      const workspacePath = await mkdtemp(join(tmpdir(), "codex-relay-workspace-"));
+      const notificationHandlers = new Set<(notification: unknown) => void>();
+      const now = Date.now() / 1000;
+      const threadId = "thread-reasoning";
+      const turnId = "turn-reasoning";
+      const publicSummary = ["**Review files**\n\nRead the entry point.", "**Check results**"];
+      const completedItems = [
+        { id: "progress", type: "agentMessage", phase: "commentary", text: "Checking results." },
+        { id: "reasoning", type: "reasoning", summary: publicSummary, content: ["fixture-hidden"] },
+        {
+          id: "tool",
+          type: "dynamicToolCall",
+          tool: "read_thread",
+          status: "failed",
+          success: false,
+        },
+        { id: "answer", type: "agentMessage", phase: "final_answer", text: "Done." },
+      ];
+      const completedTurn = {
+        id: turnId,
+        status: "completed",
+        items: completedItems,
+        durationMs: 365_000,
+        startedAt: now,
+        completedAt: now,
+      };
+      const runningTurn = {
+        id: turnId,
+        status: "inProgress",
+        items: [],
+        startedAt: now,
+        completedAt: null,
+      };
+      let completed = false;
+      function readThread() {
+        return {
+          id: threadId,
+          cwd: workspacePath,
+          createdAt: now,
+          updatedAt: now,
+          name: "Reasoning stream",
+          preview: "Reasoning stream",
+          source: "app",
+          status: { type: mode === "attach" && !completed ? "active" : "idle" },
+          turns: completed ? [completedTurn] : [],
+        };
+      }
+
+      function emitTurn() {
+        queueMicrotask(() => {
+          const notifications = [
+            { method: "turn/started", turn: runningTurn },
+            {
+              method: "item/started",
+              item: {
+                id: "reasoning",
+                type: "reasoning",
+                summary: [],
+                content: ["fixture-hidden"],
+              },
+            },
+            { method: "item/reasoning/summaryPartAdded", itemId: "reasoning", summaryIndex: 0 },
+            {
+              method: "item/reasoning/summaryTextDelta",
+              itemId: "reasoning",
+              summaryIndex: 0,
+              delta: "**Review",
+            },
+            {
+              method: "item/reasoning/summaryTextDelta",
+              itemId: "reasoning",
+              summaryIndex: 0,
+              delta: " files**\n\n",
+            },
+            {
+              method: "item/reasoning/textDelta",
+              itemId: "reasoning",
+              contentIndex: 0,
+              delta: "fixture-hidden",
+            },
+            { method: "item/reasoning/summaryPartAdded", itemId: "reasoning", summaryIndex: 1 },
+            {
+              method: "item/reasoning/summaryTextDelta",
+              itemId: "reasoning",
+              summaryIndex: 1,
+              delta: "**Check results**",
+            },
+            {
+              method: "item/started",
+              item: {
+                id: "tool",
+                type: "dynamicToolCall",
+                tool: "read_thread",
+                status: "inProgress",
+              },
+            },
+            ...completedItems.map((item) => ({ method: "item/completed", item })),
+            {
+              method: "turn/completed",
+              turn: hasTerminalItems ? completedTurn : { ...completedTurn, items: [] },
+            },
+          ];
+          for (const { method, ...params } of notifications) {
+            const notification = { method, params: { ...params, threadId, turnId } };
+            for (const handler of notificationHandlers) {
+              handler(notification);
+            }
+          }
+          completed = true;
+        });
+      }
+
+      const appServer = {
+        onNotification(handler: (notification: unknown) => void) {
+          notificationHandlers.add(handler);
+          return () => notificationHandlers.delete(handler);
+        },
+        onRequest() {
+          return () => undefined;
+        },
+        startThread: async () => readThread(),
+        readThread: async () => readThread(),
+        resumeThread: async () => {
+          if (mode === "attach") emitTurn();
+          return readThread();
+        },
+        startTurn: async () => {
+          emitTurn();
+          return runningTurn;
+        },
+      };
+      const app = createApp({ appServer: appServer as never, workspacePath });
+      if (mode === "run") {
+        await app.request("/v1/threads", {
+          method: "POST",
+          body: JSON.stringify({ title: "Reasoning stream" }),
+          headers: { "content-type": "application/json" },
+        });
+      }
+      const response = await app.request(`/v1/threads/${threadId}/runs/stream`, {
+        method: "POST",
+        body: JSON.stringify(mode === "run" ? { prompt: "Check the results" } : {}),
+        headers: { "content-type": "application/json" },
+      });
+      expect(response.status).toBe(200);
+      const body = await response.text();
+      const consumed = consumeAsMobileChatStream(body, threadId);
+      expect(consumed.errors).toEqual([]);
+      expect(body).not.toContain("fixture-hidden");
+      const messages = consumed.events.flatMap((event) =>
+        "message" in event ? [event.message] : [],
+      );
+      expect(messages).toContainEqual(
+        expect.objectContaining({
+          id: "reasoning",
+          state: "streaming",
+          details: { summary: ["**Review files**\n\n", "**Check results**"] },
+        }),
+      );
+      expect(messages).toContainEqual(
+        expect.objectContaining({
+          id: "tool",
+          state: "streaming",
+          content: "read_thread",
+          details: { type: "dynamicToolCall", status: "inProgress", tool: "read_thread" },
+        }),
+      );
+      const expectedReasoning = expect.objectContaining({
+        id: "reasoning",
+        role: "reasoning",
+        state: "completed",
+        content: publicSummary.join("\n\n"),
+        details: { summary: publicSummary },
+      });
+      const expectedTool = expect.objectContaining({
+        id: "tool",
+        role: "tool",
+        kind: "toolActivity",
+        state: "completed",
+        content: "read_thread",
+        details: { type: "dynamicToolCall", status: "failed", success: false, tool: "read_thread" },
+      });
+      const expectedProgress = expect.objectContaining({
+        id: "progress",
+        role: "assistant",
+        content: "Checking results.",
+        details: expect.objectContaining({ phase: "commentary" }),
+      });
+      const expectedAnswer = expect.objectContaining({
+        id: "answer",
+        content: "Done.",
+        details: { phase: "final_answer", turnDurationMs: 365_000 },
+      });
+      expect(chatStore$.messagesByThreadId[threadId].peek()).toEqual(
+        expect.arrayContaining([expectedReasoning, expectedTool, expectedProgress, expectedAnswer]),
+      );
+
+      const history = await createApp({ appServer: appServer as never, workspacePath }).request(
+        `/v1/threads/${threadId}`,
+      );
+      expect(history.status).toBe(200);
+      const detail = await history.json();
+      expect(detail.messages).toEqual(
+        expect.arrayContaining([expectedReasoning, expectedTool, expectedProgress, expectedAnswer]),
+      );
+      expect(JSON.stringify(detail)).not.toContain("fixture-hidden");
+    },
+  );
+
   it("does not duplicate image prompt user messages when app-server echoes the turn item", async () => {
     const workspacePath = await mkdtemp(join(tmpdir(), "codex-relay-workspace-"));
     const notificationHandlers = new Set<(notification: unknown) => void>();

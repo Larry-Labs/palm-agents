@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { type AccessibilityActionEvent, type LayoutChangeEvent, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -279,11 +280,11 @@ export function PowerTrack({
       <Animated.View
         accessible
         accessibilityActions={[
-          { label: "Increase Power", name: "increment" },
-          { label: "Decrease Power", name: "decrement" },
+          { label: t("Increase Power"), name: "increment" },
+          { label: t("Decrease Power"), name: "decrement" },
         ]}
-        accessibilityHint="Swipe up or down to adjust"
-        accessibilityLabel="Power"
+        accessibilityHint={t("Swipe up or down to adjust")}
+        accessibilityLabel={t("Power")}
         accessibilityRole="adjustable"
         accessibilityValue={{
           max: selectionCount,
@@ -418,7 +419,7 @@ function PowerSparkle({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   gestureSurface: {
     height: 44,
     justifyContent: "center",
@@ -465,13 +466,13 @@ const styles = StyleSheet.create({
     top: 0,
   },
   stop: {
-    backgroundColor: "rgba(255, 255, 255, 0.58)",
+    backgroundColor: theme.textSecondary,
     borderRadius: 999,
     height: 4,
     width: 4,
   },
   sparkle: {
-    backgroundColor: "rgba(255, 255, 255, 0.94)",
+    backgroundColor: theme.text,
     borderRadius: 999,
     position: "absolute",
   },
@@ -489,4 +490,4 @@ const styles = StyleSheet.create({
     top: 7,
     width: POWER_THUMB_SIZE,
   },
-});
+}));

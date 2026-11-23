@@ -100,7 +100,7 @@ jobs:
           ' /tmp/changeset-status.json)"
           relay_release_version="$(node -e '
             const status = require(process.argv[1]);
-            const release = status.releases.find(({ name }) => name === "codex-relay");
+            const release = status.releases.find(({ name }) => name === "@larry-labs/palm-agents-relay");
             if (release) process.stdout.write(release.newVersion);
           ' /tmp/changeset-status.json)"
           echo "relay-package-version=$relay_release_version" >> "$GITHUB_OUTPUT"
@@ -199,7 +199,7 @@ jobs:
           git switch --create changeset-release/npm-main "$GITHUB_SHA"
           pnpm version-packages:npm
           git add .changeset packages/codex-relay
-          git commit -m "chore: release codex-relay"
+          git commit -m "chore: release palm-agents-relay"
           git push --force-with-lease origin HEAD:refs/heads/changeset-release/npm-main
 
       - name: Update mobile release branch
@@ -226,11 +226,11 @@ jobs:
             if (process.env.RELAY_RELEASE_VERSION) {
               releases.push({
                 branch: "changeset-release/npm-main",
-                title: `chore: release codex-relay@${process.env.RELAY_RELEASE_VERSION}`,
+                title: `chore: release @larry-labs/palm-agents-relay@${process.env.RELAY_RELEASE_VERSION}`,
                 body: [
                   "## npm package release",
                   "",
-                  `- Package: \`codex-relay@${process.env.RELAY_RELEASE_VERSION}\``,
+                  `- Package: \`@larry-labs/palm-agents-relay@${process.env.RELAY_RELEASE_VERSION}\``,
                   "- Deployment: npm publish after merge",
                 ].join("\n"),
               });

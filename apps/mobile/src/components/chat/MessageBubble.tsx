@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import type { ChatMessage } from "codex-relay/api-schema";
 import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system/legacy";
@@ -12,6 +13,7 @@ import {
   View,
   type StyleProp,
   type TextStyle,
+  type ViewStyle,
 } from "react-native";
 import { dfetchDownload } from "react-native-direct-fetch";
 import { EnrichedMarkdownText, type MarkdownStyle } from "react-native-enriched-markdown";
@@ -31,6 +33,7 @@ import { hapticSelection } from "@/lib/haptics";
 
 import { PromptMarkdownText } from "./PromptMarkdownText";
 import { ProtocolActivityCard } from "./ProtocolActivityCard";
+import { CodeWrapToggle } from "./code-wrap-toggle";
 import { messageSegmentRenderKey } from "./message-segment-key";
 import {
   messageCodeContentForRender,
@@ -46,6 +49,7 @@ const SHIKI_CODE_BLOCK_FONT_SIZE = 11;
 const SHIKI_CODE_BLOCK_LINE_HEIGHT = 16;
 const SHIKI_MAX_HIGHLIGHT_LENGTH = 8000;
 const SHIKI_THEME = "github-dark-default";
+const SHIKI_LIGHT_THEME = "github-light-default";
 const SHIKI_FALLBACK_LANGUAGE = "text";
 const MARKDOWN_ATTACHMENT_EXTENSIONS = new Set(["markdown", "md", "mdx"]);
 const IMAGE_ATTACHMENT_EXTENSIONS = new Set(["gif", "heic", "heif", "jpg", "jpeg", "png", "webp"]);
@@ -112,17 +116,28 @@ type MarkdownSegment =
   | { code: string; kind: "code"; language: string };
 
 export const MessageBubble = memo(function MessageBubble({
+  followsTurnActivity = false,
+  isThreadRunning,
   message,
   onMessageCopied,
   onMessageRewind,
   onOpenMarkdownAttachment,
 }: {
+  followsTurnActivity?: boolean;
+  isThreadRunning: boolean;
   message: ChatMessage;
   onMessageCopied?: () => void;
   onMessageRewind?: (message: ChatMessage) => void;
   onOpenMarkdownAttachment?: (target: WorkspaceMarkdownPreviewTarget) => void;
 }) {
   const theme = useTheme();
+  const promptMarkdownStyle = useMemo(
+    () => ({
+      ...userPromptMarkdownStyle,
+      link: { ...userPromptMarkdownStyle.link, color: theme.link },
+    }),
+    [theme.link],
+  );
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
   const isError = message.role === "error";
@@ -170,7 +185,7 @@ export const MessageBubble = memo(function MessageBubble({
     onMessageCopied?.();
     Clipboard.setStringAsync(copyMarkdown).catch((caught: unknown) => {
       setCopied(false);
-      Alert.alert("Copy failed", copyFailureMessage(caught));
+      Alert.alert(t("Copy failed"), copyFailureMessage(caught));
     });
   }, [copyMarkdown, onMessageCopied]);
 
@@ -198,9 +213,9 @@ export const MessageBubble = memo(function MessageBubble({
         marginTop: 0,
       },
       code: {
-        backgroundColor: "rgba(255, 255, 255, 0.07)",
-        borderColor: "rgba(255, 255, 255, 0.12)",
-        color: "#D7E0EA",
+        backgroundColor: theme.subtle,
+        borderColor: theme.border,
+        color: theme.text,
         fontFamily: Fonts.monoMedium,
         fontSize: 13,
       },
@@ -240,9 +255,12 @@ export const MessageBubble = memo(function MessageBubble({
         marginTop: 8,
       },
       link: {
-        color: "#5fa7ff",
+        color: theme.link,
         fontFamily: Fonts.sans,
         underline: false,
+      },
+      inlineMath: {
+        color: theme.text,
       },
       list: {
         color: theme.text,
@@ -264,19 +282,33 @@ export const MessageBubble = memo(function MessageBubble({
         marginBottom: 8,
         marginTop: 0,
       },
+      math: {
+        backgroundColor: "transparent",
+        color: theme.text,
+        fontSize: 16,
+        marginBottom: 8,
+        marginTop: 4,
+      },
       strong: {
         color: theme.text,
         fontFamily: Fonts.sansSemiBold,
         fontWeight: "normal",
       },
     }),
-    [theme.backgroundSelected, theme.text, theme.textSecondary],
+    [
+      theme.backgroundSelected,
+      theme.text,
+      theme.textSecondary,
+      theme.subtle,
+      theme.border,
+      theme.link,
+    ],
   );
 
   if (isProtocolActivity(message)) {
     return (
       <View style={styles.protocolRow}>
-        <ProtocolActivityCard message={message} />
+        <ProtocolActivityCard message={message} isThreadRunning={isThreadRunning} />
       </View>
     );
   }
@@ -296,17 +328,17 @@ export const MessageBubble = memo(function MessageBubble({
       <View style={[styles.row, styles.userRow]}>
         <View style={styles.goalPromptStack}>
           <View style={styles.goalLabelPill}>
-            <Icon name="goal" size={12} tintColor="rgba(255, 255, 255, 0.66)" strokeWidth={2} />
+            <Icon name="goal" size={12} tintColor={theme.textSecondary} strokeWidth={2} />
             <NativeText allowFontScaling={false} maxFontSizeMultiplier={1} style={styles.goalLabel}>
-              Goal
+              {t("Goal")}
             </NativeText>
           </View>
           <View style={styles.goalValueBubble}>
             <PromptMarkdownText
-              color="#F2F2F2"
+              color={theme.text}
               fontSize={14}
               lineHeight={20}
-              markdownStyle={userPromptMarkdownStyle}
+              markdownStyle={promptMarkdownStyle}
               prompt={goalPrompt}
               selectable
               skills={[]}
@@ -334,7 +366,13 @@ export const MessageBubble = memo(function MessageBubble({
   }
 
   return (
-    <View style={[styles.row, isUser ? styles.userRow : styles.assistantRow]}>
+    <View
+      style={[
+        styles.row,
+        isUser ? styles.userRow : styles.assistantRow,
+        followsTurnActivity && styles.replyAfterActivity,
+      ]}
+    >
       <View
         style={[
           styles.bubble,
@@ -345,30 +383,38 @@ export const MessageBubble = memo(function MessageBubble({
       >
         {isAssistant ? (
           <View style={styles.assistantContent}>
-            <ThemedText type="code" themeColor="textSecondary" style={styles.assistantLabel}>
+            <ThemedText
+              type="code"
+              themeColor="textSecondary"
+              style={[styles.assistantLabel, followsTurnActivity && styles.activityReplyLabel]}
+            >
               Codex
             </ThemedText>
-            {markdownSegments.map((segment, index) =>
-              segment.kind === "code" ? (
-                <HighlightedCodeBlock
-                  key={messageSegmentRenderKey(segment, index)}
-                  code={segment.code}
-                  deferHighlight={message.state === "streaming"}
-                  language={segment.language}
-                />
-              ) : (
-                <EnrichedMarkdownText
-                  allowFontScaling={false}
-                  key={messageSegmentRenderKey(segment, index)}
-                  maxFontSizeMultiplier={1}
-                  markdown={messageMarkdownContentForRender(segment.content)}
-                  selectable
-                  // Tiny Codex deltas restart the native fade before intermediate text is presented.
-                  streamingAnimation={false}
-                  markdownStyle={assistantMarkdownStyle}
-                />
-              ),
-            )}
+            <View style={styles.assistantBody}>
+              {markdownSegments.map((segment, index) =>
+                segment.kind === "code" ? (
+                  <HighlightedCodeBlock
+                    key={messageSegmentRenderKey(segment, index)}
+                    code={segment.code}
+                    deferHighlight={message.state === "streaming"}
+                    language={segment.language}
+                    style={styles.inlineCodeBlock}
+                  />
+                ) : (
+                  <EnrichedMarkdownText
+                    allowFontScaling={false}
+                    flavor="github"
+                    key={messageSegmentRenderKey(segment, index)}
+                    maxFontSizeMultiplier={1}
+                    markdown={messageMarkdownContentForRender(segment.content)}
+                    selectable
+                    // Tiny Codex deltas restart the native fade before intermediate text is presented.
+                    streamingAnimation={false}
+                    markdownStyle={assistantMarkdownStyle}
+                  />
+                ),
+              )}
+            </View>
             <MessageAttachments
               imageUris={imageUris}
               markdownAttachments={markdownAttachments}
@@ -387,10 +433,10 @@ export const MessageBubble = memo(function MessageBubble({
           <View style={styles.userContent}>
             {displayContent ? (
               <PromptMarkdownText
-                color="#F2F2F2"
+                color={theme.text}
                 fontSize={14}
                 lineHeight={20}
-                markdownStyle={userPromptMarkdownStyle}
+                markdownStyle={promptMarkdownStyle}
                 prompt={displayContent}
                 selectable
                 skills={[]}
@@ -438,8 +484,9 @@ function MessageFooter({
   timestamp: string;
   variant: "assistant" | "user";
 }) {
+  const theme = useTheme();
   const isUser = variant === "user";
-  const iconTint = isUser ? "rgba(255, 255, 255, 0.72)" : "rgba(214, 222, 232, 0.62)";
+  const iconTint = theme.textSecondary;
 
   return (
     <View style={[styles.messageFooter, isUser && styles.userMessageFooter]}>
@@ -451,7 +498,7 @@ function MessageFooter({
         {timestamp}
       </ThemedText>
       <Pressable
-        accessibilityLabel={isCopied ? "Copied message Markdown" : "Copy message Markdown"}
+        accessibilityLabel={isCopied ? t("Copied message Markdown") : t("Copy message Markdown")}
         accessibilityRole="button"
         accessibilityState={{ disabled: !canCopy }}
         disabled={!canCopy}
@@ -469,7 +516,7 @@ function MessageFooter({
       </Pressable>
       {onRewindPress ? (
         <Pressable
-          accessibilityLabel="Rewind chat to before this message"
+          accessibilityLabel={t("Rewind chat to before this message")}
           accessibilityRole="button"
           hitSlop={11}
           onPress={onRewindPress}
@@ -497,7 +544,10 @@ function formatUserContent(content: string, hasImages = false) {
     return normalizedLines;
   }
 
-  return `${normalizedLines.slice(0, MAX_DISPLAY_LENGTH).trimEnd()}\n\n[Message preview truncated]`;
+  return t(
+    "{0}\n\n[Message preview truncated]",
+    normalizedLines.slice(0, MAX_DISPLAY_LENGTH).trimEnd(),
+  );
 }
 
 function formatUserCopyMarkdown(content: string, hasImages = false) {
@@ -542,7 +592,7 @@ function messageMarkdownForClipboard(
 }
 
 function copyFailureMessage(error: unknown) {
-  return error instanceof Error ? error.message : "The message could not be copied.";
+  return error instanceof Error ? error.message : t("The message could not be copied.");
 }
 
 function parseGoalPrompt(content: string) {
@@ -694,7 +744,7 @@ function fileNameFromPath(path: string) {
   const withoutQuery = path.split("?")[0] ?? path;
   const normalized = withoutQuery.replace(/\\/g, "/");
   const name = normalized.split("/").filter(Boolean).pop();
-  return name ? decodeFilePathSegment(name) : "Markdown document";
+  return name ? decodeFilePathSegment(name) : t("Markdown document");
 }
 
 function fileExtension(path: string) {
@@ -745,11 +795,11 @@ async function downloadImageFileToCache(fileUri: string, uri: string, cacheDirec
       headers: codexRelayImageRequestHeaders(),
     });
     if (response.status < 200 || response.status >= 300) {
-      throw new Error(`Image request failed with ${response.status}`);
+      throw new Error(t("Image request failed with {0}", response.status));
     }
     const tempFileInfo = await FileSystem.getInfoAsync(tempFileUri);
     if (!tempFileInfo.exists || tempFileInfo.size === 0) {
-      throw new Error("Image download produced an empty file");
+      throw new Error(t("Image download produced an empty file"));
     }
     await ensureImageCacheDirectory(cacheDirectory);
     await FileSystem.deleteAsync(fileUri, { idempotent: true });
@@ -780,7 +830,7 @@ function MessageAttachments({
         <View style={styles.messageImageGrid}>
           {imageUris.map((uri, index) => (
             <AttachmentImage
-              accessibilityLabel={`Open attached image ${index + 1}`}
+              accessibilityLabel={t("Open attached image {0}", index + 1)}
               key={`${messageId}-image-${uri}`}
               uri={uri}
               style={styles.messageImage}
@@ -810,11 +860,12 @@ function MarkdownAttachmentCard({
   attachment: WorkspaceMarkdownPreviewTarget;
   onOpen?: (target: WorkspaceMarkdownPreviewTarget) => void;
 }) {
+  const theme = useTheme();
   const extension = fileExtension(attachment.name ?? attachment.path)?.toUpperCase() ?? "MD";
 
   return (
     <Pressable
-      accessibilityLabel={`Open ${attachment.name ?? attachment.path}`}
+      accessibilityLabel={t("Open {0}", attachment.name ?? attachment.path)}
       accessibilityRole="button"
       disabled={!onOpen}
       onPress={() => {
@@ -831,21 +882,22 @@ function MarkdownAttachmentCard({
       ]}
     >
       <View style={styles.messageDocumentIcon}>
-        <Icon name="file" size={18} tintColor="#F2F2F2" />
+        <Icon name="file" size={18} tintColor={theme.text} />
       </View>
       <View style={styles.messageDocumentTextGroup}>
         <ThemedText type="smallBold" style={styles.messageDocumentName} numberOfLines={1}>
           {attachment.name ?? fileNameFromPath(attachment.path)}
         </ThemedText>
         <ThemedText type="code" style={styles.messageDocumentMeta} numberOfLines={1}>
-          Document · {extension}
+          {t("Document ·")}
+          {extension}
         </ThemedText>
       </View>
       <View style={styles.messageDocumentOpenButton}>
         <ThemedText type="smallBold" style={styles.messageDocumentOpenLabel}>
-          Open
+          {t("Open")}
         </ThemedText>
-        <Icon name="expand" size={13} tintColor="rgba(255, 255, 255, 0.76)" />
+        <Icon name="expand" size={13} tintColor={theme.textSecondary} />
       </View>
     </Pressable>
   );
@@ -875,7 +927,7 @@ function AttachmentImage({
       let fileUri = "";
       try {
         if (!FileSystem.cacheDirectory) {
-          throw new Error("File system cache directory is unavailable");
+          throw new Error(t("File system cache directory is unavailable"));
         }
 
         const cacheDirectory = `${FileSystem.cacheDirectory}codex-relay-images/`;
@@ -896,7 +948,7 @@ function AttachmentImage({
           await FileSystem.deleteAsync(fileUri, { idempotent: true }).catch(() => undefined);
         }
         if (__DEV__) {
-          console.warn("Image attachment download failed", { error, uri });
+          console.warn(t("Image attachment download failed"), { error, uri });
         }
         if (!cancelled) {
           setLocalUri("");
@@ -984,13 +1036,13 @@ function parseMarkdownSegments(markdown: string): MarkdownSegment[] {
         codeLanguage = "";
         isInCodeBlock = false;
       } else {
-        if (markdownLines.length > 0) {
+        if (markdownLines.some((line) => line.trim())) {
           segments.push({
             content: markdownLines.join("\n"),
             kind: "markdown",
           });
-          markdownLines.length = 0;
         }
+        markdownLines.length = 0;
         codeLanguage = normalizeCodeLanguage(fenceMatch[1] ?? "");
         isInCodeBlock = true;
       }
@@ -1013,7 +1065,7 @@ function parseMarkdownSegments(markdown: string): MarkdownSegment[] {
     });
   }
 
-  if (markdownLines.length > 0) {
+  if (markdownLines.some((line) => line.trim())) {
     segments.push({
       content: markdownLines.join("\n"),
       kind: "markdown",
@@ -1031,12 +1083,24 @@ export const HighlightedCodeBlock = memo(function HighlightedCodeBlock({
   code,
   deferHighlight = false,
   language,
+  style,
 }: {
   code: string;
   deferHighlight?: boolean;
   language: string;
+  style?: StyleProp<ViewStyle>;
 }) {
   const theme = useTheme();
+  const [wrapped, setWrapped] = useState(false);
+  const codeText = (
+    <HighlightedCodeText
+      code={code}
+      deferHighlight={deferHighlight}
+      language={language}
+      selectable
+    />
+  );
+
   return (
     <View
       style={[
@@ -1045,25 +1109,28 @@ export const HighlightedCodeBlock = memo(function HighlightedCodeBlock({
           backgroundColor: theme.backgroundSelected,
           borderColor: "rgba(132, 145, 165, 0.25)",
         },
+        style,
       ]}
     >
-      {language ? (
-        <NativeText
-          allowFontScaling={false}
-          maxFontSizeMultiplier={1}
-          style={[styles.codeBlockLanguage, { color: theme.textSecondary }]}
-        >
-          {language}
-        </NativeText>
-      ) : null}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <HighlightedCodeText
-          code={code}
-          deferHighlight={deferHighlight}
-          language={language}
-          selectable
-        />
-      </ScrollView>
+      <View style={styles.codeBlockHeader}>
+        {language ? (
+          <NativeText
+            allowFontScaling={false}
+            maxFontSizeMultiplier={1}
+            style={[styles.codeBlockLanguage, { color: theme.textSecondary }]}
+          >
+            {language}
+          </NativeText>
+        ) : null}
+        <CodeWrapToggle wrapped={wrapped} onToggle={() => setWrapped((value) => !value)} />
+      </View>
+      {wrapped ? (
+        codeText
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {codeText}
+        </ScrollView>
+      )}
     </View>
   );
 });
@@ -1099,7 +1166,7 @@ export const HighlightedCodeText = memo(function HighlightedCodeText({
     let isMounted = true;
     setTokens(null);
 
-    getHighlightedCodeTokens(code, shikiLanguage)
+    getHighlightedCodeTokens(code, shikiLanguage, theme.isDark)
       .then((nextTokens) => {
         if (isMounted) {
           setTokens(nextTokens);
@@ -1114,7 +1181,7 @@ export const HighlightedCodeText = memo(function HighlightedCodeText({
     return () => {
       isMounted = false;
     };
-  }, [code, deferHighlight, shikiLanguage]);
+  }, [code, deferHighlight, shikiLanguage, theme.isDark]);
 
   return (
     <NativeText
@@ -1151,7 +1218,7 @@ function getShikiLanguage(language: string): string {
   return SHIKI_LANGUAGE_BY_ALIAS[language] ?? SHIKI_FALLBACK_LANGUAGE;
 }
 
-async function getHighlightedCodeTokens(code: string, language: string) {
+async function getHighlightedCodeTokens(code: string, language: string, isDark: boolean) {
   if (language === SHIKI_FALLBACK_LANGUAGE || code.length > SHIKI_MAX_HIGHLIGHT_LENGTH) {
     return null;
   }
@@ -1159,7 +1226,7 @@ async function getHighlightedCodeTokens(code: string, language: string) {
   const highlighter = await getShikiHighlighter();
   return highlighter.codeToTokens(code, {
     lang: language,
-    theme: SHIKI_THEME,
+    theme: isDark ? SHIKI_THEME : SHIKI_LIGHT_THEME,
   }).tokens;
 }
 
@@ -1167,7 +1234,7 @@ function getShikiHighlighter() {
   shikiHighlighterPromise ??= createHighlighterCore({
     engine: createJavaScriptRegexEngine(),
     langs: SHIKI_LANGUAGE_LOADERS,
-    themes: [bundledThemes[SHIKI_THEME]],
+    themes: [bundledThemes[SHIKI_THEME], bundledThemes[SHIKI_LIGHT_THEME]],
   });
 
   return shikiHighlighterPromise;
@@ -1181,9 +1248,13 @@ function formatMessageTime(value: string) {
   return messageTimeFormatter.format(date);
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   row: {
-    marginVertical: Spacing.two,
+    marginBottom: Spacing.two,
+    marginTop: Spacing.two,
+  },
+  replyAfterActivity: {
+    marginTop: 0,
   },
   userRow: {
     alignItems: "flex-end",
@@ -1199,8 +1270,8 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
   },
   userBubble: {
-    backgroundColor: "rgba(56, 56, 56, 0.8)",
-    borderColor: "rgba(255, 255, 255, 0.09)",
+    backgroundColor: theme.backgroundElement,
+    borderColor: theme.border,
     borderWidth: 1,
     maxWidth: "82%",
     paddingHorizontal: 12,
@@ -1214,6 +1285,9 @@ const styles = StyleSheet.create({
   },
   assistantContent: {
     paddingHorizontal: 0,
+  },
+  assistantBody: {
+    gap: Spacing.two,
   },
   errorBubble: {
     backgroundColor: "rgba(216, 79, 79, 0.16)",
@@ -1230,8 +1304,8 @@ const styles = StyleSheet.create({
   },
   goalLabelPill: {
     alignItems: "center",
-    backgroundColor: "rgba(42, 42, 42, 0.92)",
-    borderColor: "rgba(255, 255, 255, 0.12)",
+    backgroundColor: theme.backgroundElement,
+    borderColor: theme.border,
     borderRadius: 14,
     borderWidth: 1,
     flexDirection: "row",
@@ -1241,15 +1315,15 @@ const styles = StyleSheet.create({
     paddingRight: 12,
   },
   goalLabel: {
-    color: "rgba(255, 255, 255, 0.9)",
+    color: theme.text,
     fontFamily: Fonts.sansMedium,
     fontSize: 12,
     includeFontPadding: false,
     lineHeight: 16,
   },
   goalValueBubble: {
-    backgroundColor: "rgba(56, 56, 56, 0.8)",
-    borderColor: "rgba(255, 255, 255, 0.09)",
+    backgroundColor: theme.backgroundElement,
+    borderColor: theme.border,
     borderRadius: 16,
     borderWidth: 1,
     paddingHorizontal: 13,
@@ -1261,7 +1335,7 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   messageImage: {
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    backgroundColor: theme.subtle,
     borderRadius: 12,
     height: 156,
     overflow: "hidden",
@@ -1277,8 +1351,8 @@ const styles = StyleSheet.create({
   },
   messageDocumentCard: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
-    borderColor: "rgba(255, 255, 255, 0.12)",
+    backgroundColor: theme.subtle,
+    borderColor: theme.border,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -1302,18 +1376,18 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   messageDocumentName: {
-    color: "#F2F2F2",
+    color: theme.text,
     fontSize: 13,
     lineHeight: 18,
   },
   messageDocumentMeta: {
-    color: "rgba(255, 255, 255, 0.62)",
+    color: theme.textSecondary,
     fontSize: 11,
     lineHeight: 15,
   },
   messageDocumentOpenButton: {
     alignItems: "center",
-    borderColor: "rgba(255, 255, 255, 0.12)",
+    borderColor: theme.border,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -1322,13 +1396,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   messageDocumentOpenLabel: {
-    color: "#F2F2F2",
+    color: theme.text,
     fontSize: 12,
     lineHeight: 16,
   },
   assistantLabel: {
     marginBottom: Spacing.one,
     opacity: 0.7,
+  },
+  activityReplyLabel: {
+    marginBottom: 0,
   },
   messageFooter: {
     alignItems: "center",
@@ -1343,7 +1420,7 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   userTimestamp: {
-    color: "rgba(255, 255, 255, 0.68)",
+    color: theme.textSecondary,
     fontSize: 10,
   },
   copyButton: {
@@ -1358,7 +1435,7 @@ const styles = StyleSheet.create({
     marginRight: -4,
   },
   copyButtonCopied: {
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    backgroundColor: theme.subtle,
   },
   copyButtonDisabled: {
     opacity: 0.36,
@@ -1369,7 +1446,7 @@ const styles = StyleSheet.create({
   },
   metaRow: {
     alignSelf: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    backgroundColor: theme.subtle,
     borderRadius: 14,
     marginVertical: Spacing.one,
     maxWidth: "90%",
@@ -1386,15 +1463,23 @@ const styles = StyleSheet.create({
     marginTop: 2,
     overflow: "hidden",
   },
-  codeBlockLanguage: {
+  inlineCodeBlock: {
+    marginBottom: 0,
+    marginTop: 0,
+  },
+  codeBlockHeader: {
+    alignItems: "center",
     borderBottomColor: "rgba(132, 145, 165, 0.18)",
     borderBottomWidth: 1,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+  },
+  codeBlockLanguage: {
+    flex: 1,
     fontFamily: Fonts.mono,
     fontSize: 11,
     lineHeight: 16,
     paddingHorizontal: 8,
-    paddingTop: 7,
-    paddingBottom: 6,
     textTransform: "uppercase",
   },
   codeBlockText: {
@@ -1410,7 +1495,7 @@ const styles = StyleSheet.create({
     fontSize: SHIKI_CODE_BLOCK_FONT_SIZE,
     lineHeight: SHIKI_CODE_BLOCK_LINE_HEIGHT,
   },
-});
+}));
 
 function isProtocolActivity(message: ChatMessage) {
   return (
@@ -1422,6 +1507,7 @@ function isProtocolActivity(message: ChatMessage) {
     message.kind === "subagentAction" ||
     message.kind === "thinking" ||
     message.kind === "toolActivity" ||
+    (message.kind === "unknown" && message.details?.type === "dynamicToolCall") ||
     message.kind === "webSearch"
   );
 }

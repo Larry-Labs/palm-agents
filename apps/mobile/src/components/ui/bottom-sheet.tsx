@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
@@ -23,7 +24,7 @@ export { SheetActionRow, SheetSelectedDot } from "./bottom-sheet-action-row";
 const KEYBOARD_DISMISS_PRESENT_FALLBACK_MS = 360;
 
 export function AppBottomSheet({
-  backAccessibilityLabel = "Back",
+  backAccessibilityLabel = t("Back"),
   children,
   androidKeyboardInputMode = "adjustResize",
   enableDynamicSizing = true,
@@ -248,7 +249,7 @@ function dismissKeyboard() {
   void KeyboardController.dismiss().catch(() => undefined);
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   background: {
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
@@ -262,7 +263,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   handleIndicator: {
-    backgroundColor: "rgba(255, 255, 255, 0.22)",
+    backgroundColor: theme.subtle,
     height: 4,
     width: 38,
   },
@@ -305,4 +306,4 @@ const styles = StyleSheet.create({
     gap: 2,
     paddingHorizontal: 14,
   },
-});
+}));

@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -41,10 +42,10 @@ export function PowerSelector({
   );
   const [previewIndex, setPreviewIndex] = useState<number>();
   const displayedSelection = previewIndex === undefined ? selected : selections[previewIndex];
-  const selectedLabel = displayedSelection ? powerSelectionLabel(displayedSelection) : "Custom";
+  const selectedLabel = displayedSelection ? powerSelectionLabel(displayedSelection) : t("Custom");
   const accessibilityValueLabel = displayedSelection
     ? powerSelectionAccessibilityLabel(displayedSelection)
-    : "Custom";
+    : t("Custom");
   const lastSelectionIdRef = useRef(selected?.id);
 
   useEffect(() => {
@@ -85,8 +86,8 @@ export function PowerSelector({
       >
         <View style={styles.headingRow}>
           <Pressable
-            accessibilityHint="Shows model, reasoning, and speed controls"
-            accessibilityLabel="Advanced"
+            accessibilityHint={t("Shows model, reasoning, and speed controls")}
+            accessibilityLabel={t("Advanced")}
             accessibilityRole="button"
             onPress={() => {
               hapticSelection();
@@ -95,7 +96,7 @@ export function PowerSelector({
             style={({ pressed }) => [styles.advancedButton, pressed ? styles.pressed : null]}
           >
             <Text style={[styles.advancedLabel, { color: theme.textSecondaryStrong }]}>
-              Advanced
+              {t("Advanced")}
             </Text>
             <Icon name="chevronRight" size={14} strokeWidth={1.8} tintColor={theme.textSecondary} />
           </Pressable>
@@ -113,8 +114,8 @@ export function PowerSelector({
       </View>
 
       <Pressable
-        accessibilityHint="Shows model, reasoning, and speed controls"
-        accessibilityLabel={`${accessibilityValueLabel}, Advanced options`}
+        accessibilityHint={t("Shows model, reasoning, and speed controls")}
+        accessibilityLabel={t("{0}, Advanced options", accessibilityValueLabel)}
         accessibilityRole="button"
         onPress={() => {
           hapticSelection();

@@ -18,6 +18,9 @@ import {
   PushNotificationSettingsResponseSchema,
   QueuedThreadInputActionResponseSchema,
   RateLimitsResponseSchema,
+  RelayAddressVerificationRequestSchema,
+  RelayAddressVerificationResponseSchema,
+  relayAddressProof,
   RenameThreadRequestSchema,
   RenameThreadResponseSchema,
   RewindThreadRequestSchema,
@@ -108,9 +111,10 @@ import {
   type StatusEntry,
 } from "es-git";
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { execFile } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import {
   closeSync,
   existsSync,
@@ -354,6 +358,7 @@ export function createApp(options: AppOptions = {}) {
     () => void
   >();
   const threadOptions = { threadSource: "codex-relay", workingDirectory: workspacePath };
+  const updateReasoningSummary = createReasoningSummaryUpdater(messagesByThreadId);
   const advanceAppServerHistoryGeneration = (threadId: string) => {
     appServerHistoryGenerationsByThreadId.set(
       threadId,
@@ -371,6 +376,13 @@ export function createApp(options: AppOptions = {}) {
       const params = recordParams(notification);
       const threadId = firstString(params, ["threadId"]);
       if (!threadId) {
+        return;
+      }
+      if (
+        notification.method === "item/reasoning/summaryPartAdded" ||
+        notification.method === "item/reasoning/summaryTextDelta"
+      ) {
+        updateReasoningSummary(notification, threadId, firstString(params, ["turnId"]));
         return;
       }
       if (notification.method === "thread/reverted") {
@@ -400,7 +412,7 @@ export function createApp(options: AppOptions = {}) {
         if (turn) {
           for (const item of turn.items) {
             if (item.type !== "userMessage") {
-              upsertAppServerItemMessage(messagesByThreadId, threadId, turn.id, item);
+              upsertAppServerItemMessage(messagesByThreadId, threadId, turn, item);
             }
           }
         }
@@ -506,6 +518,7 @@ export function createApp(options: AppOptions = {}) {
       !options.pairing ||
       c.req.method === "OPTIONS" ||
       c.req.path === apiPaths.version ||
+      (c.req.method === "POST" && c.req.path === apiPaths.relayAddressVerify) ||
       c.req.path.startsWith(`${apiPaths.imageAttachments}/`) ||
       c.req.path === apiPaths.sessionsClear ||
       c.req.path.startsWith(apiPaths.pair)
@@ -545,6 +558,46 @@ export function createApp(options: AppOptions = {}) {
     });
 
     return secureJson(c, options.pairing, secureSessionsByTokenHash, response);
+  });
+
+  app.post(apiPaths.relayAddressVerify, bodyLimit({ maxSize: 1024 }), async (c) => {
+    c.header("Cache-Control", "no-store");
+    const parsed = await parsePlainJson(c.req.raw, RelayAddressVerificationRequestSchema);
+    if (!parsed.success) {
+      return c.json(validationError(parsed.error), 400);
+    }
+
+    const { clientSessionId, challenge, proof } = parsed.data;
+    const requestOrigin = externalRequestOrigin(c.req.url, (name) => c.req.header(name));
+    const origin = URL.canParse(requestOrigin) ? new URL(requestOrigin).origin : undefined;
+    const session = await options.pairing?.sessions.getSecureSessionByClientId(clientSessionId);
+    const expectedProof =
+      session && origin
+        ? relayAddressProof(session.mobileToServerKey, "mobile", clientSessionId, origin, challenge)
+        : undefined;
+    if (
+      !session ||
+      !origin ||
+      !expectedProof ||
+      !timingSafeEqual(Buffer.from(proof, "hex"), Buffer.from(expectedProof, "hex"))
+    ) {
+      return c.json(
+        apiError("relay_address_mismatch", "The relay address could not be verified."),
+        403,
+      );
+    }
+
+    return c.json(
+      RelayAddressVerificationResponseSchema.parse({
+        proof: relayAddressProof(
+          session.serverToMobileKey,
+          "server",
+          clientSessionId,
+          origin,
+          challenge,
+        ),
+      }),
+    );
   });
 
   app.post(apiPaths.pair, async (c) => {
@@ -3112,6 +3165,7 @@ export function createApp(options: AppOptions = {}) {
             appServer,
             controller,
             encoder,
+            updateReasoningSummary,
             messagesByThreadId,
             pendingApprovals,
             secureSession,
@@ -3148,6 +3202,7 @@ export function createApp(options: AppOptions = {}) {
           controller,
           codex,
           encoder,
+          updateReasoningSummary,
           liveThreads,
           messagesByThreadId,
           pendingApprovals,
@@ -3453,6 +3508,7 @@ async function runPromptStreamed(input: {
   controller: ReadableStreamDefaultController<Uint8Array>;
   codex: CodexClient;
   encoder: TextEncoder;
+  updateReasoningSummary: ReturnType<typeof createReasoningSummaryUpdater>;
   liveThreads: Map<string, ReturnType<CodexClient["startThread"]>>;
   messagesByThreadId: Map<string, ChatMessage[]>;
   pendingApprovals: Map<string, PendingApproval>;
@@ -3483,6 +3539,7 @@ async function runPromptStreamed(input: {
       activeAppServerTurnIdsByThreadId: input.activeAppServerTurnIdsByThreadId,
       controller: input.controller,
       encoder: input.encoder,
+      updateReasoningSummary: input.updateReasoningSummary,
       messagesByThreadId: input.messagesByThreadId,
       pendingApprovals: input.pendingApprovals,
       queuedInputsByThreadId: input.queuedInputsByThreadId,
@@ -3879,6 +3936,7 @@ async function streamRunningAppServerThread(input: {
   appServer: CodexAppServerClient;
   controller: ReadableStreamDefaultController<Uint8Array>;
   encoder: TextEncoder;
+  updateReasoningSummary: ReturnType<typeof createReasoningSummaryUpdater>;
   messagesByThreadId: Map<string, ChatMessage[]>;
   pendingApprovals: Map<string, PendingApproval>;
   secureSession?: SecureSessionHandle;
@@ -4064,19 +4122,15 @@ async function streamRunningAppServerThread(input: {
             if (!item || typeof item !== "object") {
               return;
             }
-            let message = upsertAppServerItemMessage(
+            const message = upsertAppServerItemMessage(
               input.messagesByThreadId,
               input.threadId,
               firstString(params, ["turnId"]) ?? activeTurnId,
               item as AppServerThreadItem,
+              notification.method === "item/started" ? "streaming" : "completed",
             );
             if (!message) {
               return;
-            }
-            if (notification.method === "item/started") {
-              message = updateMessage(input.messagesByThreadId, input.threadId, message.id, {
-                state: "streaming",
-              });
             }
             const isAsyncAgentMessage = isAsyncAppServerAgentMessage(item as AppServerThreadItem);
             if (isAsyncAgentMessage) {
@@ -4102,6 +4156,32 @@ async function streamRunningAppServerThread(input: {
               thread: threadSummary,
               message,
             });
+            return;
+          }
+          case "item/reasoning/summaryPartAdded":
+          case "item/reasoning/summaryTextDelta": {
+            const message = input.updateReasoningSummary(
+              notification,
+              input.threadId,
+              activeTurnId,
+            );
+            if (message) {
+              observedTurnActivity = true;
+              producedTurnOutput ||= Boolean(message.content);
+              threadSummary ??= updateThread(
+                input.threads,
+                input.messagesByThreadId,
+                input.threadId,
+                {
+                  state: "running",
+                },
+              );
+              sendSse(input.controller, input.encoder, input.secureSession, {
+                type: "thread.message.created",
+                thread: threadSummary,
+                message,
+              });
+            }
             return;
           }
           case "item/agentMessage/delta": {
@@ -4196,7 +4276,7 @@ async function streamRunningAppServerThread(input: {
                 const message = upsertAppServerItemMessage(
                   input.messagesByThreadId,
                   input.threadId,
-                  terminalTurn.id,
+                  terminalTurn,
                   item,
                 );
                 if (!message) {
@@ -4252,18 +4332,13 @@ async function streamRunningAppServerThread(input: {
               finish();
               return;
             }
-            const assistantMessage = assistantMessageId
-              ? input.messagesByThreadId
-                  .get(input.threadId)
-                  ?.find((message) => message.id === assistantMessageId)
-              : undefined;
-            if (assistantMessageId && assistantMessage?.state !== "completed") {
-              const completedMessage = updateMessage(
-                input.messagesByThreadId,
-                input.threadId,
-                assistantMessageId,
-                { state: "completed" },
-              );
+            const completedMessage = completeAppServerAssistantMessage(
+              input.messagesByThreadId,
+              input.threadId,
+              assistantMessageId,
+              terminalTurn,
+            );
+            if (completedMessage) {
               sendSse(input.controller, input.encoder, input.secureSession, {
                 type: "thread.message.completed",
                 thread: threadSummary ?? input.threads.get(input.threadId)!,
@@ -4371,6 +4446,7 @@ async function runAppServerPromptStreamed(input: {
   attachments: PromptAttachment[];
   controller: ReadableStreamDefaultController<Uint8Array>;
   encoder: TextEncoder;
+  updateReasoningSummary: ReturnType<typeof createReasoningSummaryUpdater>;
   messagesByThreadId: Map<string, ChatMessage[]>;
   pendingApprovals: Map<string, PendingApproval>;
   queuedInputsByThreadId: Map<string, QueuedThreadInput[]>;
@@ -4513,6 +4589,7 @@ async function runAppServerPromptStreamed(input: {
     lastError?: string;
     method: string;
     state: "completed" | "failed";
+    turn?: AppServerTurn;
     turnId?: string;
   }) {
     const terminalTurnId = options.turnId ?? activeTurnId;
@@ -4554,18 +4631,13 @@ async function runAppServerPromptStreamed(input: {
       return;
     }
 
-    const assistantMessage = assistantMessageId
-      ? input.messagesByThreadId
-          .get(activeThreadId)
-          ?.find((message) => message.id === assistantMessageId)
-      : undefined;
-    if (assistantMessageId && assistantMessage?.state !== "completed") {
-      const completedMessage = updateMessage(
-        input.messagesByThreadId,
-        activeThreadId,
-        assistantMessageId,
-        { state: "completed" },
-      );
+    const completedMessage = completeAppServerAssistantMessage(
+      input.messagesByThreadId,
+      activeThreadId,
+      assistantMessageId,
+      options.turn,
+    );
+    if (completedMessage) {
       sendSse(input.controller, input.encoder, input.secureSession, {
         type: "thread.message.completed",
         thread: threadSummary,
@@ -4674,8 +4746,9 @@ async function runAppServerPromptStreamed(input: {
       const message = upsertAppServerItemMessage(
         input.messagesByThreadId,
         activeThreadId,
-        turn.id,
+        turn,
         item,
+        turnIsRunning && item.type === "reasoning" ? "streaming" : "completed",
       );
       if (!message) {
         continue;
@@ -4721,6 +4794,7 @@ async function runAppServerPromptStreamed(input: {
       lastError: state === "failed" ? turnErrorMessage(params) : undefined,
       method: "turn/returned",
       state,
+      turn,
       turnId: turn.id,
     });
   }
@@ -4839,19 +4913,15 @@ async function runAppServerPromptStreamed(input: {
               return;
             }
             const turnId = firstString(params, ["turnId"]) ?? activeTurnId;
-            let message = upsertAppServerItemMessage(
+            const message = upsertAppServerItemMessage(
               input.messagesByThreadId,
               activeThreadId,
               turnId,
               item as AppServerThreadItem,
+              notification.method === "item/started" ? "streaming" : "completed",
             );
             if (!message) {
               return;
-            }
-            if (notification.method === "item/started") {
-              message = updateMessage(input.messagesByThreadId, activeThreadId, message.id, {
-                state: "streaming",
-              });
             }
             const isAsyncAgentMessage = isAsyncAppServerAgentMessage(item as AppServerThreadItem);
             if (isAsyncAgentMessage) {
@@ -4877,6 +4947,23 @@ async function runAppServerPromptStreamed(input: {
               thread: threadSummary,
               message,
             });
+            return;
+          }
+          case "item/reasoning/summaryPartAdded":
+          case "item/reasoning/summaryTextDelta": {
+            const message = input.updateReasoningSummary(
+              notification,
+              activeThreadId,
+              activeTurnId,
+            );
+            if (message) {
+              producedTurnOutput ||= Boolean(message.content);
+              sendSse(input.controller, input.encoder, input.secureSession, {
+                type: "thread.message.created",
+                thread: threadSummary,
+                message,
+              });
+            }
             return;
           }
           case "item/agentMessage/delta": {
@@ -4982,6 +5069,7 @@ async function runAppServerPromptStreamed(input: {
                     lastError: state === "failed" ? turnErrorMessage(params) : undefined,
                     method: notification.method,
                     state,
+                    turn: terminalTurn?.id === terminalTurnId ? terminalTurn : undefined,
                     turnId: terminalTurnId,
                   });
                 });
@@ -5511,22 +5599,53 @@ function appendMessageWithId(
   return message;
 }
 
+function completeAppServerAssistantMessage(
+  messagesByThreadId: Map<string, ChatMessage[]>,
+  threadId: string,
+  assistantMessageId: string | undefined,
+  turn: AppServerTurn | undefined,
+) {
+  const message = messagesByThreadId.get(threadId)?.find((item) => item.id === assistantMessageId);
+  if (!message) {
+    return undefined;
+  }
+  // Newer servers can finish a turn with timing but omit the already delivered items.
+  const duration = turn?.id === message.turnId && turn ? appServerTurnDurationMs(turn) : undefined;
+  const timingChanged = duration !== undefined && message.details?.turnDurationMs !== duration;
+  if (message.state === "completed" && !timingChanged) {
+    return undefined;
+  }
+  return updateMessage(messagesByThreadId, threadId, message.id, {
+    state: "completed",
+    ...(timingChanged ? { details: { ...message.details, turnDurationMs: duration } } : {}),
+  });
+}
+
 function upsertAppServerItemMessage(
   messagesByThreadId: Map<string, ChatMessage[]>,
   threadId: string,
-  turnId: string | undefined,
+  turn: AppServerTurn | string | undefined,
   item: AppServerThreadItem,
+  state: "streaming" | "completed" = "completed",
 ) {
-  const message = mapAppServerItem(threadId, appServerTurnShell(turnId), item);
+  const message = mapAppServerItem(
+    threadId,
+    typeof turn === "object" ? turn : appServerTurnShell(turn),
+    item,
+  );
   if (!message) {
     return undefined;
   }
 
   const existing = messagesByThreadId.get(threadId)?.find((candidate) => candidate.id === item.id);
   if (existing) {
+    if (state === "streaming" && item.type === "reasoning" && existing.kind === "thinking") {
+      return existing;
+    }
     return updateMessage(messagesByThreadId, threadId, item.id, {
       ...message,
       createdAt: existing.createdAt,
+      state,
     });
   }
 
@@ -5535,9 +5654,59 @@ function upsertAppServerItemMessage(
     kind: message.kind,
     content: message.content,
     details: message.details,
-    state: message.state,
+    state,
     turnId: message.turnId,
   });
+}
+
+function createReasoningSummaryUpdater(messagesByThreadId: Map<string, ChatMessage[]>) {
+  // The same notification can be delivered to the history listener and multiple SSE streams.
+  const updates = new WeakMap<AppServerNotification, ChatMessage>();
+  const indexedParts = new WeakMap<ChatMessage, Map<number, string>>();
+  return (notification: AppServerNotification, threadId: string, turnId: string | undefined) => {
+    const params = recordParams(notification);
+    if (firstString(params, ["threadId"]) !== threadId) {
+      return;
+    }
+    const existingUpdate = updates.get(notification);
+    if (existingUpdate) {
+      return existingUpdate;
+    }
+
+    const itemId = firstString(params, ["itemId"]);
+    const index = firstNumber(params, ["summaryIndex"]);
+    if (!itemId || index === undefined || !Number.isSafeInteger(index) || index < 0) {
+      return;
+    }
+    const previous = messagesByThreadId.get(threadId)?.find(({ id }) => id === itemId);
+    if (previous && (previous.kind !== "thinking" || previous.state !== "streaming")) {
+      return;
+    }
+
+    const parts =
+      (previous && indexedParts.get(previous)) ??
+      new Map(stringArray(previous?.details?.summary).map((part, index) => [index, part]));
+    const delta = streamDelta(params);
+    if (!delta && (notification.method !== "item/reasoning/summaryPartAdded" || parts.has(index))) {
+      return;
+    }
+    parts.set(index, (parts.get(index) ?? "") + (delta ?? ""));
+    const summary = [...parts].sort(([left], [right]) => left - right).map(([, part]) => part);
+    const patch = {
+      role: "reasoning" as const,
+      kind: "thinking" as const,
+      state: "streaming" as const,
+      turnId: firstString(params, ["turnId"]) ?? turnId ?? previous?.turnId,
+      content: summary.filter((part) => part.trim()).join("\n\n"),
+      details: { summary },
+    };
+    const message = previous
+      ? updateMessage(messagesByThreadId, threadId, itemId, patch)
+      : appendMessageWithId(messagesByThreadId, threadId, itemId, patch);
+    indexedParts.set(message, parts);
+    updates.set(notification, message);
+    return message;
+  };
 }
 
 function replaceDuplicateInitialUserMessage(
@@ -6610,8 +6779,11 @@ function resolveRuntimeOptions(
 function resolveAppServerRuntime(options: RuntimeOptionSubset | undefined, workspacePath: string) {
   const runtime = resolveRuntimeOptions(options?.runtimeMode) ?? {};
   const sandbox = options?.sandboxMode ?? runtime.sandboxMode ?? "workspace-write";
+  const approvalPolicy = options?.approvalPolicy ?? runtime.approvalPolicy ?? "on-request";
   return {
-    approvalPolicy: options?.approvalPolicy ?? runtime.approvalPolicy ?? "on-request",
+    // Current app-server versions removed on-failure; normalize legacy auto mode
+    // and saved overrides while retaining approval before sandbox escalation.
+    approvalPolicy: approvalPolicy === "on-failure" ? "on-request" : approvalPolicy,
     sandbox,
     sandboxPolicy: sandboxPolicyForMode(sandbox, workspacePath),
   };
@@ -7191,7 +7363,10 @@ function rolloutRecordMessage(
       threadId,
       role,
       content: messageParts?.content ?? content,
-      details: messageParts?.details,
+      details:
+        role === "assistant"
+          ? rolloutAgentMessageDetails(messageParts?.details, payload.phase)
+          : undefined,
       createdAt: timestamp,
       state: "completed",
       turnId,
@@ -7226,7 +7401,7 @@ function rolloutRecordMessage(
       threadId,
       role: "assistant",
       content: messageParts.content,
-      details: messageParts.details,
+      details: rolloutAgentMessageDetails(messageParts.details, payload.phase),
       createdAt: timestamp,
       state: "completed",
       turnId,
@@ -7300,6 +7475,13 @@ function rolloutRecordMessage(
   }
 
   return undefined;
+}
+
+function rolloutAgentMessageDetails(
+  details: ChatMessage["details"],
+  phase: unknown,
+): ChatMessage["details"] {
+  return phase === "commentary" || phase === "final_answer" ? { ...details, phase } : details;
 }
 
 function rolloutResponseItemMessageContent(
@@ -7710,30 +7892,30 @@ function mapAppServerItem(threadId: string, turn: AppServerTurn, item: AppServer
       const agentItem = item as Extract<AppServerThreadItem, { type: "agentMessage" }>;
       const planContent = proposedPlanContent(agentItem.text);
       const messageParts = appServerAgentMessageParts(agentItem);
-      const details = planContent
-        ? { raw: agentItem.text }
-        : agentItem.delivery || messageParts.details
-          ? { ...messageParts.details, delivery: agentItem.delivery ?? undefined }
-          : undefined;
+      const turnDurationMs = appServerTurnDurationMs(turn);
+      const details = {
+        ...(planContent ? { raw: agentItem.text } : messageParts.details),
+        ...(agentItem.delivery ? { delivery: agentItem.delivery } : {}),
+        ...(agentItem.phase ? { phase: agentItem.phase } : {}),
+        ...(turnDurationMs !== undefined ? { turnDurationMs } : {}),
+      };
       return ChatMessageSchema.parse({
         ...base,
         role: "assistant",
         kind: planContent ? "plan" : undefined,
         content: planContent ?? messageParts.content,
-        details,
+        details: Object.keys(details).length > 0 ? details : undefined,
       });
     }
     case "reasoning": {
       const reasoningItem = item as Extract<AppServerThreadItem, { type: "reasoning" }>;
-      const summary = compactStringList(reasoningItem.summary);
-      const content = compactStringList(reasoningItem.content);
-      const text = [...summary, ...content].join("\n\n") || "Reasoning";
+      const summary = stringArray(reasoningItem.summary);
       return ChatMessageSchema.parse({
         ...base,
         role: "reasoning",
         kind: "thinking",
-        content: text,
-        details: { summary, content },
+        content: summary.join("\n\n"),
+        details: { summary },
       });
     }
     case "commandExecution": {
@@ -7783,6 +7965,22 @@ function mapAppServerItem(threadId: string, turn: AppServerTurn, item: AppServer
           server: toolItem.server,
           status: toolItem.status ?? undefined,
           tool: toolItem.tool,
+        },
+      });
+    }
+    case "dynamicToolCall": {
+      const toolItem = item as Extract<AppServerThreadItem, { type: "dynamicToolCall" }>;
+      const tool = toolItem.tool?.trim();
+      return ChatMessageSchema.parse({
+        ...base,
+        role: "tool",
+        kind: "toolActivity",
+        content: tool || "",
+        details: {
+          type: toolItem.type,
+          status: toolItem.status ?? undefined,
+          success: toolItem.success ?? undefined,
+          tool,
         },
       });
     }
@@ -7873,6 +8071,17 @@ function mapUnknownAppServerItem(threadId: string, turn: AppServerTurn, item: Ap
     state: "completed",
     details: kind === "plan" ? planDetailsFromRecord(record) : { type },
   });
+}
+
+function appServerTurnDurationMs(turn: AppServerTurn) {
+  const duration =
+    turn.durationMs ??
+    (typeof turn.startedAt === "number" && typeof turn.completedAt === "number"
+      ? (turn.completedAt - turn.startedAt) * 1000
+      : undefined);
+  return typeof duration === "number" && Number.isFinite(duration) && duration >= 0
+    ? Math.round(duration)
+    : undefined;
 }
 
 function appServerTurnShell(turnId: string | undefined): AppServerTurn {
@@ -8130,10 +8339,6 @@ function preview(content: string) {
   return normalized.length > 140 ? `${normalized.slice(0, 137)}...` : normalized;
 }
 
-function compactStringList(value: string[] | undefined) {
-  return value?.map((item) => item.trim()).filter(Boolean) ?? [];
-}
-
 function summarizeFileChanges(changes: Array<{ path: string; kind: string }>) {
   if (changes.length === 0) {
     return "Files changed";
@@ -8154,12 +8359,13 @@ function structuredStreamMessage(
   const type = item?.type ? String(item.type) : undefined;
 
   if (role === "reasoning") {
-    const summary = stringArray(item?.summary);
-    const content = stringArray(item?.content);
+    const summary = Array.isArray(item?.summary)
+      ? stringArray(item.summary)
+      : stringArray([item?.text]);
     return {
       kind: "thinking",
-      content: [...summary, ...content].join("\n\n") || fallbackContent,
-      details: { content, summary, type },
+      content: summary.join("\n\n"),
+      details: { summary, type },
     };
   }
 

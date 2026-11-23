@@ -1,3 +1,5 @@
+import { useTheme } from "@/hooks/use-theme";
+import { t } from "../i18n";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -17,18 +19,19 @@ import { StyleSheet } from "react-native-unistyles";
 
 import { ThemedText } from "@/components/themed-text";
 import { Icon } from "@/components/ui/icon";
-import { Colors, Fonts, Spacing } from "@/constants/theme";
+import { Fonts, Spacing } from "@/constants/theme";
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 4;
 const RESET_DURATION_MS = 180;
 
 export default function ImageViewerScreen() {
+  const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { height, width } = useWindowDimensions();
   const params = useLocalSearchParams<{ title?: string; uri?: string }>();
   const uri = normalizedParam(params.uri);
-  const title = normalizedParam(params.title) ?? "Image";
+  const title = normalizedParam(params.title) ?? t("Image");
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -111,23 +114,23 @@ export default function ImageViewerScreen() {
       <StatusBar style="light" />
       <View style={[styles.header, { paddingTop: insets.top + Spacing.two }]}>
         <Pressable
-          accessibilityLabel="Close image viewer"
+          accessibilityLabel={t("Close image viewer")}
           accessibilityRole="button"
           onPress={() => router.back()}
           style={styles.headerButton}
         >
-          <Icon name="x" size={21} tintColor={Colors.dark.text} />
+          <Icon name="x" size={21} tintColor={theme.text} />
         </Pressable>
         <ThemedText numberOfLines={1} style={styles.title}>
           {title}
         </ThemedText>
         <Pressable
-          accessibilityLabel="Reset image zoom"
+          accessibilityLabel={t("Reset image zoom")}
           accessibilityRole="button"
           onPress={resetZoom}
           style={styles.headerButton}
         >
-          <RotateCcw color={Colors.dark.text} size={19} strokeWidth={2} />
+          <RotateCcw color={theme.text} size={19} strokeWidth={2} />
         </Pressable>
       </View>
       <GestureDetector gesture={imageGesture}>
@@ -143,9 +146,9 @@ export default function ImageViewerScreen() {
             </Animated.View>
           ) : (
             <View style={styles.empty}>
-              <ThemedText style={styles.emptyTitle}>Image unavailable</ThemedText>
+              <ThemedText style={styles.emptyTitle}>{t("Image unavailable")}</ThemedText>
               <ThemedText type="small" themeColor="textSecondary" style={styles.emptyText}>
-                This attachment could not be opened.
+                {t("This attachment could not be opened.")}
               </ThemedText>
             </View>
           )}
@@ -175,7 +178,7 @@ function resetTiming() {
   };
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   screen: {
     backgroundColor: "#050505",
     flex: 1,
@@ -195,8 +198,8 @@ const styles = StyleSheet.create({
   },
   headerButton: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderColor: "rgba(255, 255, 255, 0.12)",
+    backgroundColor: theme.subtle,
+    borderColor: theme.border,
     borderRadius: 20,
     borderWidth: 1,
     height: 40,
@@ -204,7 +207,7 @@ const styles = StyleSheet.create({
     width: 40,
   },
   title: {
-    color: Colors.dark.text,
+    color: theme.text,
     flex: 1,
     fontFamily: Fonts.sansSemiBold,
     fontSize: 13,
@@ -230,7 +233,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
   },
   emptyTitle: {
-    color: Colors.dark.text,
+    color: theme.text,
     fontFamily: Fonts.sansSemiBold,
     fontSize: 16,
     lineHeight: 22,
@@ -239,4 +242,4 @@ const styles = StyleSheet.create({
     maxWidth: 280,
     textAlign: "center",
   },
-});
+}));

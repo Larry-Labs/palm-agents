@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import "@/global.css";
 import "expo-dev-client";
 import "react-native-gesture-handler";
@@ -9,7 +10,7 @@ import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client
 import { useFonts } from "expo-font";
 import * as Notifications from "expo-notifications";
 import { router, Stack } from "expo-router";
-import { DarkTheme, ThemeProvider } from "expo-router/react-navigation";
+import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router/react-navigation";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { Text, TextInput } from "react-native";
@@ -18,6 +19,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import { useInitialPushNotificationRegistration } from "@/hooks/use-initial-push-notification-registration";
+import { useTheme } from "@/hooks/use-theme";
 import { hotUpdater } from "@/lib/hot-updater";
 import {
   addHotUpdaterLog,
@@ -39,16 +41,6 @@ import { setActiveThread } from "@/state/chat-store";
 
 void SplashScreen.preventAutoHideAsync();
 configurePushNotificationPresentation();
-
-const appTheme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    background: "#191919",
-    border: "rgba(255, 255, 255, 0.08)",
-    card: "#202222",
-  },
-};
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -83,7 +75,7 @@ TextInputWithDefaults.defaultProps = {
 
 async function checkForLaunchUpdate() {
   if (hotUpdater === null) {
-    addHotUpdaterLog("warning", "OTA launch check skipped", "No update server is configured.");
+    addHotUpdaterLog("warning", "OTA launch check skipped", t("No update server is configured."));
     return;
   }
   addHotUpdaterLog(
@@ -141,6 +133,19 @@ async function checkForLaunchUpdate() {
 }
 
 function TabLayout() {
+  const theme = useTheme();
+  const navigationTheme = theme.isDark ? DarkTheme : DefaultTheme;
+  const appTheme = {
+    ...navigationTheme,
+    colors: {
+      ...navigationTheme.colors,
+      background: theme.background,
+      card: theme.sidebar,
+      border: theme.border,
+      text: theme.text,
+      primary: theme.primary,
+    },
+  };
   useInitialPushNotificationRegistration();
   const [fontsLoaded] = useFonts({
     GeistMono: require("../../assets/fonts/GeistMono-Regular.ttf"),
@@ -212,13 +217,14 @@ function TabLayout() {
               <Stack
                 screenOptions={{
                   contentStyle: {
-                    backgroundColor: "#191919",
+                    backgroundColor: theme.background,
                   },
                   headerShown: false,
                 }}
               >
                 <Stack.Screen name="(drawer)" />
                 <Stack.Screen name="pair" />
+                <Stack.Screen name="relay-address" options={{ animation: "slide_from_right" }} />
                 <Stack.Screen
                   name="image-viewer"
                   options={{
@@ -233,7 +239,7 @@ function TabLayout() {
                   name="settings"
                   options={{
                     animation: "slide_from_right",
-                    title: "Settings",
+                    title: t("Settings"),
                   }}
                 />
                 <Stack.Screen
@@ -247,7 +253,7 @@ function TabLayout() {
                   name="workspace-file-editor"
                   options={{
                     animation: "slide_from_right",
-                    title: "File Editor",
+                    title: t("File Editor"),
                   }}
                 />
               </Stack>

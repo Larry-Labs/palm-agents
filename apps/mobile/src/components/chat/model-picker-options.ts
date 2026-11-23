@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import type { CodexModel, ReasoningEffort, RuntimePreferences } from "codex-relay/api-schema";
 
 export type ModelPickerOption<Value extends string = string> = {
@@ -45,14 +46,15 @@ const genericReasoningEfforts: ReasoningEffort[] = [
   "xhigh",
   "max",
 ];
+const knownReasoningEfforts = new Set<ReasoningEffort>([...genericReasoningEfforts, "ultra"]);
 const reasoningSubtitles = new Map<ReasoningEffort, string>([
-  ["minimal", "Minimal reasoning for the fastest replies"],
-  ["low", "Fast replies with light reasoning"],
-  ["medium", "Balanced reasoning for everyday work"],
-  ["high", "Deeper reasoning for complex work"],
-  ["xhigh", "Extra reasoning for difficult problems"],
-  ["max", "Maximum reasoning depth for the hardest problems"],
-  ["ultra", "Maximum reasoning with automatic task delegation"],
+  ["minimal", t("Minimal reasoning for the fastest replies")],
+  ["low", t("Fast replies with light reasoning")],
+  ["medium", t("Balanced reasoning for everyday work")],
+  ["high", t("Deeper reasoning for complex work")],
+  ["xhigh", t("Extra reasoning for difficult problems")],
+  ["max", t("Maximum reasoning depth for the hardest problems")],
+  ["ultra", t("Maximum reasoning with automatic task delegation")],
 ]);
 
 export function powerSelectionsForModels(models: CodexModel[]) {
@@ -99,8 +101,8 @@ export function modelButtonLabel(
   reasoningEffort: ReasoningEffort | undefined,
   fallbackModelLabel?: string,
 ) {
-  const modelLabel = model?.displayName ?? fallbackModelLabel ?? "No models";
-  return modelLabel !== "No models" && reasoningEffort
+  const modelLabel = model?.displayName ?? fallbackModelLabel ?? t("No models");
+  return modelLabel !== t("No models") && reasoningEffort
     ? `${modelLabel} ${reasoningTitle(reasoningEffort)}`
     : modelLabel;
 }
@@ -124,7 +126,9 @@ export function normalizeRuntimePreferencesForModels(
     ...preferences,
     model: model.model,
     reasoningEffort:
-      preferences.reasoningEffort ?? reasoningEffortForModel(model, preferences.reasoningEffort),
+      preferences.reasoningEffort && !knownReasoningEfforts.has(preferences.reasoningEffort)
+        ? preferences.reasoningEffort
+        : reasoningEffortForModel(model, preferences.reasoningEffort),
   };
 }
 
@@ -162,7 +166,7 @@ export function reasoningDisplayOptions(
     label: reasoningTitle(effort),
     subtitle:
       effort === "ultra"
-        ? "Consumes usage limits faster"
+        ? t("Consumes usage limits faster")
         : (model?.reasoningEffortOptions.find((option) => option.reasoningEffort === effort)
             ?.description ?? reasoningSubtitle(effort)),
     value: effort,
@@ -176,22 +180,22 @@ export function speedDisplayOptions(
   const fastServiceTier = fastServiceTierForModel(model);
   const options: SpeedDisplayOption[] = [
     {
-      label: "Standard",
-      subtitle: "Standard speed and usage",
+      label: t("Standard"),
+      subtitle: t("Standard speed and usage"),
       value: undefined,
     },
   ];
   if (fastServiceTier) {
     options.push({
-      label: "Fast",
-      subtitle: fastServiceTier.description?.trim() || "1.5x speed, more usage",
+      label: t("Fast"),
+      subtitle: fastServiceTier.description?.trim() || t("1.5x speed, more usage"),
       value: fastServiceTier.id,
     });
   }
   if (selectedServiceTier && !options.some((option) => option.value === selectedServiceTier)) {
     options.push({
-      label: "Custom",
-      subtitle: `Service tier: ${selectedServiceTier}`,
+      label: t("Custom"),
+      subtitle: t("Service tier: {0}", selectedServiceTier),
       value: selectedServiceTier,
     });
   }
@@ -199,12 +203,25 @@ export function speedDisplayOptions(
 }
 
 export function shortModelLabel(model: CodexModel | undefined, fallback?: string) {
-  return (model?.displayName ?? fallback ?? "Default")
+  return (model?.displayName ?? fallback ?? t("Default"))
     .replace(/^GPT-/u, "")
     .replace(/-(?=[A-Z])/gu, " ");
 }
 
 export function reasoningTitle(effort: ReasoningEffort) {
+  const labels: Partial<Record<ReasoningEffort, string>> = {
+    minimal: "极低",
+    low: "低",
+    medium: "中",
+    high: "高",
+    xhigh: "超高",
+    max: "最高",
+    ultra: "极致",
+  };
+  const localizedLabel = Object.hasOwn(labels, effort) ? labels[effort] : undefined;
+  if (localizedLabel) {
+    return localizedLabel;
+  }
   const title = effort
     .replace(/^x[-_\s]*(?=high(?:[-_\s]|$))/u, "extra-")
     .split(/[-_\s]+/u)
@@ -215,7 +232,7 @@ export function reasoningTitle(effort: ReasoningEffort) {
 }
 
 function reasoningSubtitle(effort: ReasoningEffort) {
-  return reasoningSubtitles.get(effort) ?? `Use ${reasoningTitle(effort)} reasoning`;
+  return reasoningSubtitles.get(effort) ?? t("Use {0} reasoning", reasoningTitle(effort));
 }
 
 function hasCompactPower(model: CodexModel) {

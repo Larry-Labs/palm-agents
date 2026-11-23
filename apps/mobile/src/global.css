@@ -2,8 +2,6 @@
 @import "uniwind";
 @plugin "tailwindcss-animate";
 
-@custom-variant dark (&:is(.dark *));
-
 @theme {
   --color-border: hsl(0 0% 26%);
   --color-input: hsl(0 0% 19%);
@@ -29,6 +27,49 @@
   --radius-sm: calc(0.625rem - 4px);
   --font-sans: Geist;
   --font-mono: GeistMono;
+}
+
+@layer theme {
+  :root {
+    @variant light {
+      --color-border: #dedfe2;
+      --color-input: #f5f5f5;
+      --color-ring: #6b6d73;
+      --color-background: #ffffff;
+      --color-foreground: #202123;
+      --color-primary: #202123;
+      --color-primary-foreground: #ffffff;
+      --color-secondary: #f5f5f5;
+      --color-secondary-foreground: #202123;
+      --color-muted: #e8e9eb;
+      --color-muted-foreground: #6b6d73;
+      --color-accent: #e8e9eb;
+      --color-accent-foreground: #202123;
+      --color-popover: #ffffff;
+      --color-popover-foreground: #202123;
+      --color-card: #f5f5f5;
+      --color-card-foreground: #202123;
+    }
+    @variant dark {
+      --color-border: #3a3a3a;
+      --color-input: #2a2a2a;
+      --color-ring: #9a9a9a;
+      --color-background: #191919;
+      --color-foreground: #f2f2f2;
+      --color-primary: #f2f2f2;
+      --color-primary-foreground: #191919;
+      --color-secondary: #2a2a2a;
+      --color-secondary-foreground: #f2f2f2;
+      --color-muted: #383838;
+      --color-muted-foreground: #9a9a9a;
+      --color-accent: #383838;
+      --color-accent-foreground: #f2f2f2;
+      --color-popover: #232323;
+      --color-popover-foreground: #f2f2f2;
+      --color-card: #2a2a2a;
+      --color-card-foreground: #f2f2f2;
+    }
+  }
 }
 
 :root {

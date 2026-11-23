@@ -20,7 +20,7 @@ import { getConnectUrlGuidance } from "./pairing-url-candidates.js";
 
 import { codexRelayDataPath, codexRelayHome, legacyCodexRelayDataPath } from "./paths.js";
 
-const npxCommand = "npx codex-relay@latest";
+const npxCommand = "npx @larry-labs/palm-agents-relay@latest";
 
 type ServerState = {
   connectUrl?: string;
@@ -37,8 +37,8 @@ type ClearPairingResult = {
 };
 
 const program = new Command()
-  .name("codex-relay")
-  .description("Run and approve the codex-relay local CLI bridge.")
+  .name("palm-agents-relay")
+  .description("Run the Palm Agents relay and approve mobile pairing.")
   .option("--bg", "run the Codex Relay server in the background")
   .option("--debug", "write verbose relay diagnostics to debug.log")
   .option(
@@ -123,7 +123,7 @@ async function startBackgroundServer() {
 
   const existingPid = await readRunningRelayPid(pidPath);
   if (existingPid) {
-    console.log(`codex-relay is already running in the background (pid ${existingPid}).`);
+    console.log(`Palm Agents Relay is already running in the background (pid ${existingPid}).`);
     console.log(`Logs: ${logPath}`);
     if (process.env.CODEX_RELAY_DEBUG === "1") {
       console.log(`Debug logs: ${debugLogPath}`);

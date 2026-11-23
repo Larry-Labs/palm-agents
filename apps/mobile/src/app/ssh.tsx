@@ -1,3 +1,5 @@
+import { useTheme } from "@/hooks/use-theme";
+import { t } from "../i18n";
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Pressable, View } from "react-native";
@@ -8,7 +10,7 @@ import { StyleSheet } from "react-native-unistyles";
 import { WorkspaceSshTerminalTab } from "@/components/chat/workspace-preview/WorkspaceSshTerminalTab";
 import { ThemedText } from "@/components/themed-text";
 import { Icon } from "@/components/ui/icon";
-import { Colors, Spacing } from "@/constants/theme";
+import { Spacing } from "@/constants/theme";
 import { hapticSelection } from "@/lib/haptics";
 import { serverStateKeys, serverStateQueryFns } from "@/lib/server-state";
 
@@ -16,6 +18,7 @@ import { serverStateKeys, serverStateQueryFns } from "@/lib/server-state";
 const sshScreenSessionKey = "ssh-screen";
 
 export default function SshScreen() {
+  const theme = useTheme();
   const statusQuery = useQuery({
     queryKey: serverStateKeys.status(),
     queryFn: serverStateQueryFns.status,
@@ -38,18 +41,18 @@ export default function SshScreen() {
       <View style={styles.header}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Close SSH"
+          accessibilityLabel={t("Close SSH")}
           onPress={closeScreen}
           style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
         >
-          <Icon name="back" size={18} tintColor={Colors.dark.text} />
+          <Icon name="back" size={18} tintColor={theme.text} />
         </Pressable>
         <View style={styles.titleGroup}>
           <ThemedText type="smallBold" numberOfLines={1} style={styles.title}>
             SSH
           </ThemedText>
           <ThemedText type="code" themeColor="textSecondary" numberOfLines={1}>
-            {workspacePath ?? "Relay workspace"}
+            {workspacePath ?? t("Relay workspace")}
           </ThemedText>
         </View>
       </View>
@@ -60,9 +63,9 @@ export default function SshScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   screen: {
-    backgroundColor: Colors.dark.background,
+    backgroundColor: theme.background,
     flex: 1,
   },
   header: {
@@ -97,4 +100,4 @@ const styles = StyleSheet.create({
     minHeight: 0,
     paddingTop: Spacing.three,
   },
-});
+}));

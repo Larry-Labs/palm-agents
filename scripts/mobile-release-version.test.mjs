@@ -126,7 +126,7 @@ test("prepares the production iOS App Store configuration", () => {
   assert.equal(easConfig.build.production.distribution, "store");
   assert.equal(easConfig.build.production.autoIncrement, true);
   assert.equal(easConfig.build.production.ios.buildConfiguration, "Release");
-  assert.equal(easConfig.submit.production.ios.ascAppId, "6764463488");
+  assert.equal(easConfig.submit.production.ios?.ascAppId, undefined);
 });
 
 test("checks v1 infrastructure and Bundle state around an OTA deploy", () => {

@@ -1,23 +1,29 @@
 import type { ConfigContext, ExpoConfig } from "expo/config";
 import { config } from "dotenv";
+import brand from "./brand.json";
 
-config({ path: ".env.hotupdater.rc22", quiet: true });
+config({ path: ".env.local", quiet: true });
 
 const hotUpdaterApiKey =
   process.env.EXPO_PUBLIC_HOT_UPDATER_API_KEY?.trim() || process.env.HOT_UPDATER_API_KEY?.trim();
+const easProjectId = process.env.EAS_PROJECT_ID?.trim();
+const hotUpdaterPublicKeyPath = process.env.HOT_UPDATER_PUBLIC_KEY_PATH?.trim();
+const hotUpdaterEnabled = Boolean(
+  process.env.EXPO_PUBLIC_HOT_UPDATER_BASE_URL?.trim() && hotUpdaterPublicKeyPath,
+);
 
 export default function appConfig(_context: ConfigContext): ExpoConfig {
   return {
-    name: "Codex Relay",
-    slug: "codex-relay",
+    name: brand.name,
+    slug: brand.slug,
     version: "1.6.3",
     orientation: "default",
     icon: "./assets/images/icon.png",
-    scheme: "codex-relay",
+    scheme: brand.scheme,
     userInterfaceStyle: "automatic",
     ios: {
       icon: "./assets/images/icon.png",
-      bundleIdentifier: "com.gronstudio.codexrelay",
+      bundleIdentifier: brand.identifier,
       deploymentTarget: "16.4",
       supportsTablet: true,
       infoPlist: {
@@ -26,8 +32,7 @@ export default function appConfig(_context: ConfigContext): ExpoConfig {
           NSAllowsLocalNetworking: true,
         },
         ITSAppUsesNonExemptEncryption: false,
-        NSLocalNetworkUsageDescription:
-          "Codex Relay uses the local network to connect this device to the Codex Relay server running on your computer.",
+        NSLocalNetworkUsageDescription: "通过本地网络连接电脑上的 Codex Relay 服务器。",
         "UISupportedInterfaceOrientations~ipad": [
           "UIInterfaceOrientationPortrait",
           "UIInterfaceOrientationPortraitUpsideDown",
@@ -43,7 +48,7 @@ export default function appConfig(_context: ConfigContext): ExpoConfig {
         monochromeImage: "./assets/images/android-icon-monochrome.png",
       },
       predictiveBackGestureEnabled: false,
-      package: "com.gronstudio.codexrelay",
+      package: brand.identifier,
       permissions: ["android.permission.CAMERA", "android.permission.POST_NOTIFICATIONS"],
     },
     web: {
@@ -73,8 +78,7 @@ export default function appConfig(_context: ConfigContext): ExpoConfig {
       [
         "expo-camera",
         {
-          cameraPermission:
-            "Codex Relay uses the camera to scan QR codes that contain your local relay server address, for example to connect this device to the Codex Relay server running on your computer.",
+          cameraPermission: "使用相机扫描电脑上的 Relay 配对二维码。",
           microphonePermission: false,
           recordAudioAndroid: false,
           barcodeScannerEnabled: true,
@@ -83,8 +87,7 @@ export default function appConfig(_context: ConfigContext): ExpoConfig {
       [
         "expo-image-picker",
         {
-          photosPermission:
-            "Codex Relay uses photo library access so you can attach images to a Codex chat, for example to ask Codex to inspect a screenshot.",
+          photosPermission: "选择照片或截图作为聊天附件。",
           microphonePermission: false,
         },
       ],
@@ -93,13 +96,17 @@ export default function appConfig(_context: ConfigContext): ExpoConfig {
       "expo-notifications",
       "expo-system-ui",
       "expo-web-browser",
-      [
-        "@hot-updater/expo",
-        {
-          channel: "production",
-          publicKeyPath: "./keys/public-key.pem",
-        },
-      ],
+      ...(hotUpdaterEnabled && hotUpdaterPublicKeyPath
+        ? [
+            [
+              "@hot-updater/expo",
+              {
+                channel: "production",
+                publicKeyPath: hotUpdaterPublicKeyPath,
+              },
+            ] as [string, { channel: string; publicKeyPath: string }],
+          ]
+        : []),
       [
         "expo-secure-store",
         {
@@ -121,10 +128,9 @@ export default function appConfig(_context: ConfigContext): ExpoConfig {
     },
     extra: {
       hotUpdaterApiKey,
+      hotUpdaterEnabled,
       router: {},
-      eas: {
-        projectId: "6659e28f-2ac7-4055-8f56-7b4ca5e65847",
-      },
+      ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),
     },
   };
 }

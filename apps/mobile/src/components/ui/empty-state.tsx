@@ -1,8 +1,8 @@
+import { useTheme } from "@/hooks/use-theme";
 import { Pressable, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 import { ThemedText } from "@/components/themed-text";
-import { Colors } from "@/constants/theme";
 
 import { Icon, type AppIconName } from "./icon";
 
@@ -18,9 +18,10 @@ export type EmptyStateProps = {
 
 // Centered unavailable-content message; iOS renders it with SwiftUI.
 export function EmptyState({ title, description, icon, action }: EmptyStateProps) {
+  const theme = useTheme();
   return (
     <View style={styles.container}>
-      <Icon name={icon} size={36} tintColor={Colors.dark.textSecondary} />
+      <Icon name={icon} size={36} tintColor={theme.textSecondary} />
       <ThemedText type="subtitle" style={styles.title}>
         {title}
       </ThemedText>
@@ -43,7 +44,7 @@ export function EmptyState({ title, description, icon, action }: EmptyStateProps
   );
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   container: {
     alignItems: "center",
     flex: 1,
@@ -54,11 +55,11 @@ const styles = StyleSheet.create({
   title: { marginTop: 8, textAlign: "center" },
   description: { textAlign: "center" },
   button: {
-    backgroundColor: Colors.dark.backgroundElement,
+    backgroundColor: theme.backgroundElement,
     borderRadius: 10,
     marginTop: 12,
     paddingHorizontal: 16,
     paddingVertical: 9,
   },
   pressed: { opacity: 0.7 },
-});
+}));

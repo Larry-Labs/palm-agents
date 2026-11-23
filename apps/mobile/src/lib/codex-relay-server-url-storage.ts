@@ -1,6 +1,8 @@
+import { t } from "../i18n";
 import { createMMKV } from "react-native-mmkv";
 
 const defaultServerUrl = "http://localhost:8787";
+const manualServerUrlsStorageKey = "codex-relay.manual-server-urls";
 const serverUrlCandidatesStorageKey = "codex-relay.server-url-candidates";
 const serverUrlStorageKey = "codex-relay.server-url";
 
@@ -9,6 +11,7 @@ export const codexRelayStorage = createMMKV({ id: "codex-relay" });
 export type CodexRelayServerUrlCandidate = {
   label: string;
   url: string;
+  manual: boolean;
 };
 
 export const fallbackCodexRelayServerUrl =
@@ -19,10 +22,16 @@ export function getCodexRelayServerUrl() {
 }
 
 export function getCodexRelayServerUrlCandidates(): CodexRelayServerUrlCandidate[] {
-  return serverUrlCandidatesFromUrls([
+  const manual = new Set(readStoredUrls(manualServerUrlsStorageKey));
+  return dedupeServerUrls([
     getCodexRelayServerUrl(),
-    ...readStoredServerUrlCandidates(),
-  ]);
+    ...manual,
+    ...readStoredUrls(serverUrlCandidatesStorageKey),
+  ]).map((url) => ({
+    label: manual.has(url) ? t("Custom address") : serverUrlCandidateLabel(url),
+    url,
+    manual: manual.has(url),
+  }));
 }
 
 export function setCodexRelayServerUrl(url: string) {
@@ -34,21 +43,37 @@ export function setCodexRelayServerUrl(url: string) {
 export function clearCodexRelayServerUrlState() {
   codexRelayStorage.remove(serverUrlStorageKey);
   codexRelayStorage.remove(serverUrlCandidatesStorageKey);
+  clearManualCodexRelayAddresses();
+}
+
+export function clearManualCodexRelayAddresses() {
+  codexRelayStorage.remove(manualServerUrlsStorageKey);
 }
 
 export function saveCodexRelayServerUrlCandidates(urls: string[]) {
   codexRelayStorage.set(serverUrlCandidatesStorageKey, JSON.stringify(dedupeServerUrls(urls)));
 }
 
+export function saveManualCodexRelayAddress(url: string, replaces?: string) {
+  const previous = readStoredUrls(manualServerUrlsStorageKey);
+  const urls = [url, ...previous.filter((candidate) => candidate !== replaces)];
+  const discovered = readStoredUrls(serverUrlCandidatesStorageKey);
+  const currentUrl = getCodexRelayServerUrl();
+  saveCodexRelayServerUrlCandidates(
+    [currentUrl, ...discovered].filter((candidate) => candidate !== replaces),
+  );
+  codexRelayStorage.set(manualServerUrlsStorageKey, JSON.stringify(dedupeServerUrls(urls)));
+}
+
 export function normalizeServerUrl(url: string) {
   const trimmed = url.trim().replace(/\/$/, "");
   if (!trimmed) {
-    throw new Error("Server URL is empty.");
+    throw new Error(t("Server URL is empty."));
   }
 
   const parsed = new URL(trimmed);
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error("Server URL must start with http:// or https://.");
+    throw new Error(t("Server URL must start with http:// or https://."));
   }
 
   return parsed.toString().replace(/\/$/, "");
@@ -91,8 +116,8 @@ export function isLocalIPv6Host(host: string) {
   );
 }
 
-function readStoredServerUrlCandidates() {
-  const stored = codexRelayStorage.getString(serverUrlCandidatesStorageKey);
+function readStoredUrls(key: string) {
+  const stored = codexRelayStorage.getString(key);
   if (!stored) {
     return [];
   }
@@ -107,34 +132,27 @@ function readStoredServerUrlCandidates() {
   }
 }
 
-function serverUrlCandidatesFromUrls(urls: string[]): CodexRelayServerUrlCandidate[] {
-  return dedupeServerUrls(urls).map((url) => ({
-    label: serverUrlCandidateLabel(url),
-    url,
-  }));
-}
-
 function serverUrlCandidateLabel(url: string) {
   try {
     const parsed = new URL(url);
     const host = parsed.hostname.toLowerCase();
     if (host === "localhost" || host === "127.0.0.1" || host === "::1") {
-      return "Localhost";
+      return t("Localhost");
     }
     if (host.endsWith(".local")) {
-      return "Local network";
+      return t("Local network");
     }
     if (host.endsWith(".ts.net") || host.endsWith(".beta.tailscale.net")) {
-      return "Tailscale DNS";
+      return t("Tailscale DNS");
     }
     if (isCarrierGradePrivateIPv4Host(host)) {
-      return "Tailscale IP";
+      return t("Tailscale IP");
     }
     if (isPrivateIPv4Host(host) || isLocalIPv6Host(host)) {
-      return "LAN IP";
+      return t("LAN IP");
     }
-    return "Server";
+    return t("Server");
   } catch {
-    return "Server";
+    return t("Server");
   }
 }

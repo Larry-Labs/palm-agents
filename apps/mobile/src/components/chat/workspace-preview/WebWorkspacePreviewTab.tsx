@@ -1,3 +1,5 @@
+import { useTheme } from "@/hooks/use-theme";
+import { t } from "../../../i18n";
 import type { WebPreviewTarget } from "codex-relay/api-schema";
 import { useSelector } from "@legendapp/state/react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
@@ -10,7 +12,7 @@ import { ThemedText } from "@/components/themed-text";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Text as UiText } from "@/components/ui/text";
-import { Colors, Fonts, Spacing } from "@/constants/theme";
+import { Fonts, Spacing } from "@/constants/theme";
 import { getCodexRelayServerUrl, startWorkspaceTailscaleServe } from "@/lib/codex-relay-api";
 import { hapticSelection } from "@/lib/haptics";
 import {
@@ -28,6 +30,7 @@ export const WebWorkspacePreviewTab = memo(function WebWorkspacePreviewTab({
   workspacePath?: string;
   webPreviewTarget?: WebPreviewTarget;
 }) {
+  const theme = useTheme();
   const baseServerUrl = serverUrl || getCodexRelayServerUrl();
   const insets = useSafeAreaInsets();
   const guessedPreviewUrl = useMemo(() => guessWebPreviewUrl(baseServerUrl), [baseServerUrl]);
@@ -146,7 +149,7 @@ export const WebWorkspacePreviewTab = memo(function WebWorkspacePreviewTab({
     } catch (error) {
       setTailscaleServeStatus({
         kind: "error",
-        message: errorMessage(error, "Could not start Tailscale Serve."),
+        message: errorMessage(error, t("Could not start Tailscale Serve.")),
       });
     }
   }
@@ -174,14 +177,14 @@ export const WebWorkspacePreviewTab = memo(function WebWorkspacePreviewTab({
           }}
           onSubmitEditing={commitWebUrl}
           placeholder="http://localhost:3000"
-          placeholderTextColor="#7A8493"
+          placeholderTextColor={theme.textSecondary}
           returnKeyType="go"
           style={styles.urlInput}
           value={webUrlDraft}
         />
         <Button
           accessibilityRole="button"
-          accessibilityLabel="Open web preview URL"
+          accessibilityLabel={t("Open web preview URL")}
           onPress={commitWebUrl}
           size="lg"
           variant="secondary"
@@ -189,7 +192,7 @@ export const WebWorkspacePreviewTab = memo(function WebWorkspacePreviewTab({
           style={({ pressed }) => [styles.goButton, pressed && styles.pressed]}
         >
           <UiText className="text-foreground" style={styles.goButtonText}>
-            Go
+            {t("Go")}
           </UiText>
         </Button>
       </View>
@@ -199,7 +202,7 @@ export const WebWorkspacePreviewTab = memo(function WebWorkspacePreviewTab({
           key={`${webUrl}-${webReloadKey}`}
           allowsBackForwardNavigationGestures
           onError={(event) => {
-            setWebError(event.nativeEvent.description || "Unable to load the web preview.");
+            setWebError(event.nativeEvent.description || t("Unable to load the web preview."));
           }}
           onHttpError={(event) => {
             setWebError(`HTTP ${event.nativeEvent.statusCode}`);
@@ -216,10 +219,10 @@ export const WebWorkspacePreviewTab = memo(function WebWorkspacePreviewTab({
         {webError ? (
           <View style={styles.webErrorOverlay}>
             <View style={styles.webErrorIcon}>
-              <Icon name="web" size={18} tintColor={Colors.dark.textSecondary} />
+              <Icon name="web" size={18} tintColor={theme.textSecondary} />
             </View>
             <ThemedText type="smallBold" style={styles.webErrorTitle}>
-              Unable to load preview
+              {t("Unable to load preview")}
             </ThemedText>
             <ThemedText
               type="small"
@@ -232,7 +235,10 @@ export const WebWorkspacePreviewTab = memo(function WebWorkspacePreviewTab({
             {shouldShowTailscaleServeAction && tailscaleServeCandidate ? (
               <Button
                 accessibilityRole="button"
-                accessibilityLabel={`Run Tailscale Serve for port ${tailscaleServeCandidate.port}`}
+                accessibilityLabel={t(
+                  "Run Tailscale Serve for port {0}",
+                  tailscaleServeCandidate.port,
+                )}
                 disabled={tailscaleServeStatus.kind === "loading"}
                 onPress={handleStartTailscaleServe}
                 size="lg"
@@ -253,19 +259,19 @@ export const WebWorkspacePreviewTab = memo(function WebWorkspacePreviewTab({
                 </View>
                 <View style={styles.tailscaleRetryRun}>
                   {tailscaleServeStatus.kind === "loading" ? (
-                    <ActivityIndicator color={Colors.dark.text} size="small" />
+                    <ActivityIndicator color={theme.text} size="small" />
                   ) : (
-                    <Icon name="terminal" size={14} tintColor={Colors.dark.text} />
+                    <Icon name="terminal" size={14} tintColor={theme.text} />
                   )}
                   <UiText className="text-foreground" style={styles.tailscaleServeButtonText}>
-                    Run
+                    {t("Run")}
                   </UiText>
                 </View>
               </Button>
             ) : (
               <Button
                 accessibilityRole="button"
-                accessibilityLabel="Retry web preview"
+                accessibilityLabel={t("Retry web preview")}
                 onPress={() => {
                   hapticSelection();
                   setWebReloadKey((current) => current + 1);
@@ -275,13 +281,13 @@ export const WebWorkspacePreviewTab = memo(function WebWorkspacePreviewTab({
                 className="rounded-md border border-border bg-secondary/80"
                 style={({ pressed }) => [styles.webErrorRetry, pressed && styles.pressed]}
               >
-                <Icon name="refresh" size={14} tintColor={Colors.dark.text} />
+                <Icon name="refresh" size={14} tintColor={theme.text} />
                 <UiText
                   className="text-foreground"
                   numberOfLines={1}
                   style={styles.webErrorRetryText}
                 >
-                  Retry
+                  {t("Retry")}
                 </UiText>
               </Button>
             )}
@@ -299,26 +305,26 @@ export const WebWorkspacePreviewTab = memo(function WebWorkspacePreviewTab({
       </View>
       <View style={styles.webControlsBar}>
         <WebControlButton
-          accessibilityLabel="Go back in web preview"
+          accessibilityLabel={t("Go back in web preview")}
           disabled={!webNavigationState.canGoBack}
           icon="back"
           onPress={navigateBack}
         />
         <WebControlButton
-          accessibilityLabel="Go forward in web preview"
+          accessibilityLabel={t("Go forward in web preview")}
           disabled={!webNavigationState.canGoForward}
           icon="forward"
           onPress={navigateForward}
         />
         <WebControlButton
-          accessibilityLabel="Reload web preview"
+          accessibilityLabel={t("Reload web preview")}
           disabled={webNavigationState.loading}
           icon="refresh"
           onPress={reloadWebView}
         />
         <View style={styles.webControlsStatus}>
           <ThemedText type="code" themeColor="textSecondary" numberOfLines={1}>
-            {webNavigationState.loading ? "Loading" : webPreviewHostLabel(webUrlDraft)}
+            {webNavigationState.loading ? t("Loading") : webPreviewHostLabel(webUrlDraft)}
           </ThemedText>
         </View>
       </View>
@@ -347,6 +353,7 @@ function WebControlButton({
   icon: "back" | "forward" | "refresh";
   onPress: () => void;
 }) {
+  const theme = useTheme();
   return (
     <Button
       accessibilityRole="button"
@@ -358,11 +365,7 @@ function WebControlButton({
       className="rounded-md border border-border bg-secondary/80"
       style={({ pressed }) => [styles.webControlButton, pressed && !disabled && styles.pressed]}
     >
-      <Icon
-        name={icon}
-        size={15}
-        tintColor={disabled ? Colors.dark.textSecondary : Colors.dark.text}
-      />
+      <Icon name={icon} size={15} tintColor={disabled ? theme.textSecondary : theme.text} />
     </Button>
   );
 }
@@ -390,7 +393,7 @@ function webPreviewHostLabel(value: string) {
   try {
     return new URL(normalizePreviewUrl(value, value)).host || value;
   } catch {
-    return value.trim() || "Preview";
+    return value.trim() || t("Preview");
   }
 }
 
@@ -445,7 +448,7 @@ function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   contentPane: {
     flex: 1,
     marginHorizontal: Spacing.three,
@@ -459,11 +462,11 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   urlInput: {
-    backgroundColor: Colors.dark.backgroundElement,
-    borderColor: "rgba(255, 255, 255, 0.12)",
+    backgroundColor: theme.backgroundElement,
+    borderColor: theme.border,
     borderRadius: 8,
     borderWidth: 1,
-    color: Colors.dark.text,
+    color: theme.text,
     flex: 1,
     fontFamily: Fonts.mono,
     fontSize: 12,
@@ -478,14 +481,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two,
   },
   goButtonText: {
-    color: Colors.dark.text,
+    color: theme.text,
     fontFamily: Fonts.sansBold,
     fontSize: 14,
     lineHeight: 18,
   },
   tailscaleRetryAction: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.07)",
+    backgroundColor: theme.subtle,
     borderColor: "rgba(132, 145, 165, 0.22)",
     borderRadius: 8,
     borderWidth: 1,
@@ -507,13 +510,13 @@ const styles = StyleSheet.create({
     paddingRight: Spacing.two,
   },
   tailscaleCommandPrompt: {
-    color: Colors.dark.textSecondary,
+    color: theme.textSecondary,
     fontFamily: Fonts.monoMedium,
     fontSize: 13,
     lineHeight: 18,
   },
   tailscaleCommandText: {
-    color: Colors.dark.text,
+    color: theme.text,
     flex: 1,
     fontFamily: Fonts.mono,
     fontSize: 13,
@@ -531,7 +534,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two,
   },
   tailscaleServeButtonText: {
-    color: Colors.dark.text,
+    color: theme.text,
     flexShrink: 1,
     fontFamily: Fonts.sansBold,
     fontSize: 13,
@@ -541,7 +544,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two,
   },
   webViewFrame: {
-    backgroundColor: Colors.dark.backgroundElement,
+    backgroundColor: theme.backgroundElement,
     borderColor: "rgba(132, 145, 165, 0.22)",
     borderRadius: 8,
     borderWidth: 1,
@@ -550,7 +553,7 @@ const styles = StyleSheet.create({
   },
   webControlsBar: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.055)",
+    backgroundColor: theme.subtle,
     borderColor: "rgba(132, 145, 165, 0.22)",
     borderRadius: 8,
     borderWidth: 1,
@@ -571,16 +574,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two,
   },
   webView: {
-    backgroundColor: Colors.dark.backgroundElement,
+    backgroundColor: theme.backgroundElement,
     flex: 1,
   },
   webViewErrorBlank: {
-    backgroundColor: Colors.dark.backgroundElement,
+    backgroundColor: theme.backgroundElement,
     flex: 1,
   },
   webErrorOverlay: {
     alignItems: "center",
-    backgroundColor: Colors.dark.backgroundElement,
+    backgroundColor: theme.backgroundElement,
     bottom: 0,
     gap: Spacing.two,
     justifyContent: "center",
@@ -592,7 +595,7 @@ const styles = StyleSheet.create({
   },
   webErrorIcon: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    backgroundColor: theme.subtle,
     borderColor: "rgba(132, 145, 165, 0.24)",
     borderRadius: 22,
     borderWidth: 1,
@@ -619,7 +622,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
   },
   webErrorRetryText: {
-    color: Colors.dark.text,
+    color: theme.text,
     flexShrink: 1,
     fontFamily: Fonts.sansBold,
     fontSize: 13,
@@ -628,4 +631,4 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.7,
   },
-});
+}));

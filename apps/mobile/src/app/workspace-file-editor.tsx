@@ -1,3 +1,5 @@
+import { useTheme } from "@/hooks/use-theme";
+import { t } from "../i18n";
 import type { WorkspaceFileContentResponse } from "codex-relay/api-schema";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -16,7 +18,7 @@ import { Icon } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { WorkspaceCodeWebView } from "@/components/chat/workspace-preview/WorkspaceCodeWebView";
-import { Colors, Spacing } from "@/constants/theme";
+import { Spacing } from "@/constants/theme";
 import { getWorkspaceFileContent, updateWorkspaceFileContent } from "@/lib/codex-relay-api";
 import { hapticSelection } from "@/lib/haptics";
 import {
@@ -25,6 +27,7 @@ import {
 } from "@/lib/workspace-file-queries";
 
 export default function WorkspaceFileEditorScreen() {
+  const theme = useTheme();
   const params = useLocalSearchParams<{ path?: string; workspacePath?: string }>();
   const path = normalizedParam(params.path);
   const workspacePath = normalizedParam(params.workspacePath);
@@ -80,15 +83,15 @@ export default function WorkspaceFileEditorScreen() {
       router.back();
       return;
     }
-    Alert.alert("Discard changes?", "Your unsaved edits will be lost.", [
+    Alert.alert(t("Discard changes?"), t("Your unsaved edits will be lost."), [
       {
-        text: "Keep Editing",
+        text: t("Keep Editing"),
         style: "cancel",
       },
       {
         onPress: () => router.back(),
         style: "destructive",
-        text: "Discard",
+        text: t("Discard"),
       },
     ]);
   }, [isDirty]);
@@ -113,18 +116,18 @@ export default function WorkspaceFileEditorScreen() {
         <View style={styles.header}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Close file editor"
+            accessibilityLabel={t("Close file editor")}
             onPress={closeEditor}
             style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
           >
-            <Icon name="back" size={18} tintColor={Colors.dark.text} />
+            <Icon name="back" size={18} tintColor={theme.text} />
           </Pressable>
           <View style={styles.titleGroup}>
             <ThemedText type="smallBold" numberOfLines={1} style={styles.title}>
-              {fileContent?.name ?? path?.split("/").pop() ?? "File Editor"}
+              {fileContent?.name ?? path?.split("/").pop() ?? t("File Editor")}
             </ThemedText>
             <ThemedText type="code" themeColor="textSecondary" numberOfLines={1}>
-              {fileContent?.path ?? path ?? "Workspace"}
+              {fileContent?.path ?? path ?? t("Workspace")}
             </ThemedText>
           </View>
           <Button
@@ -136,13 +139,15 @@ export default function WorkspaceFileEditorScreen() {
             variant="default"
             className="h-9 min-w-[62px] rounded-md px-3"
           >
-            <Text variant="small">{isSavingFile ? "Saving" : "Save"}</Text>
+            <Text variant="small">{isSavingFile ? t("Saving") : t("Save")}</Text>
           </Button>
         </View>
 
         <View style={styles.metaBar}>
           <ThemedText type="code" themeColor="textSecondary" numberOfLines={1}>
-            {fileContent ? `${fileMeta(fileContent)} / ${lineCount} lines` : (workspacePath ?? "")}
+            {fileContent
+              ? t("{0} / {1} lines", fileMeta(fileContent), lineCount)
+              : (workspacePath ?? "")}
           </ThemedText>
         </View>
 
@@ -156,25 +161,31 @@ export default function WorkspaceFileEditorScreen() {
 
         <View style={styles.editorShell}>
           {!path ? (
-            <EditorState title="Missing file" message="No workspace file path was provided." />
+            <EditorState
+              title={t("Missing file")}
+              message={t("No workspace file path was provided.")}
+            />
           ) : fileContentQuery.isLoading ? (
             <View style={styles.loadingState}>
-              <ActivityIndicator color={Colors.dark.textSecondary} size="small" />
+              <ActivityIndicator color={theme.textSecondary} size="small" />
               <ThemedText type="small" themeColor="textSecondary">
-                Loading file
+                {t("Loading file")}
               </ThemedText>
             </View>
           ) : fileContentQuery.error ? (
             <EditorState
-              title="Unable to load file"
+              title={t("Unable to load file")}
               message={errorMessage(fileContentQuery.error)}
             />
           ) : fileContent?.binary ? (
-            <EditorState title="Binary file" message="This editor supports text files only." />
+            <EditorState
+              title={t("Binary file")}
+              message={t("This editor supports text files only.")}
+            />
           ) : fileContent?.truncated ? (
             <EditorState
-              title="File too large"
-              message="Large truncated previews cannot be edited."
+              title={t("File too large")}
+              message={t("Large truncated previews cannot be edited.")}
             />
           ) : fileContent ? (
             <WorkspaceCodeWebView
@@ -188,8 +199,8 @@ export default function WorkspaceFileEditorScreen() {
             />
           ) : (
             <EditorState
-              title="File not found"
-              message="Select another file from Workspace Preview."
+              title={t("File not found")}
+              message={t("Select another file from Workspace Preview.")}
             />
           )}
         </View>
@@ -239,7 +250,7 @@ function formatBytes(bytes: number) {
 }
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Unknown error";
+  return error instanceof Error ? error.message : t("Unknown error");
 }
 
 function languageFromPath(path: string) {
@@ -247,9 +258,9 @@ function languageFromPath(path: string) {
   return extension || "text";
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   screen: {
-    backgroundColor: Colors.dark.background,
+    backgroundColor: theme.background,
     flex: 1,
   },
   keyboardAwareContent: {
@@ -300,7 +311,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   emptyState: {
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    backgroundColor: theme.subtle,
     borderColor: "rgba(132, 145, 165, 0.2)",
     borderCurve: "continuous",
     borderRadius: 8,
@@ -322,4 +333,4 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.7,
   },
-});
+}));

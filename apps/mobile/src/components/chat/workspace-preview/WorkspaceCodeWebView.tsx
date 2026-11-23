@@ -1,3 +1,4 @@
+import { t } from "../../../i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -137,7 +138,7 @@ export function WorkspaceCodeWebView({
         <View style={styles.editorWebLoading}>
           <ActivityIndicator color="#8EA2BD" size="small" />
           <ThemedText type="small" style={styles.editorWebLoadingText}>
-            Loading editor
+            {t("Loading editor")}
           </ThemedText>
         </View>
       ) : null}
@@ -178,9 +179,9 @@ function normalizeMonacoLanguage(language: string) {
   return aliases[normalized] ?? normalized;
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   editorInputFrame: {
-    backgroundColor: "#252525",
+    backgroundColor: theme.surface,
     borderColor: "rgba(132, 145, 165, 0.18)",
     borderCurve: "continuous",
     borderRadius: 8,
@@ -195,12 +196,12 @@ const styles = StyleSheet.create({
     minHeight: 0,
   },
   editorWebView: {
-    backgroundColor: "#252525",
+    backgroundColor: theme.surface,
     flex: 1,
   },
   editorWebLoading: {
     alignItems: "center",
-    backgroundColor: "#252525",
+    backgroundColor: theme.surface,
     bottom: 0,
     gap: Spacing.two,
     justifyContent: "center",
@@ -228,4 +229,4 @@ const styles = StyleSheet.create({
     color: "#F87171",
     flex: 1,
   },
-});
+}));

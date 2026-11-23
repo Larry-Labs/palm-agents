@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { observable } from "@legendapp/state";
 import type {
   AgentSkill,
@@ -443,7 +444,7 @@ export function resetChatSessionState() {
   chatStore$.collaborationModeByThreadId.set({});
   chatStore$.queuedPromptsByThreadId.set({});
   chatStore$.connection.set("offline");
-  chatStore$.error.set("Pair with your computer to continue.");
+  chatStore$.error.set(t("Pair with your computer to continue."));
   chatStore$.hasPairedSession.set(false);
   chatStore$.threadMessagesLoadingByThreadId.set({});
   chatStore$.threadStreamReconnectRequest.set(undefined);

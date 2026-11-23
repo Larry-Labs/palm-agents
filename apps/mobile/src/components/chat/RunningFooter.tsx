@@ -102,7 +102,7 @@ function RunningLabel() {
   return (
     <Animated.View style={animatedStyle}>
       <ThemedText type="code" themeColor="textSecondary">
-        Working…
+        正在处理…
       </ThemedText>
     </Animated.View>
   );

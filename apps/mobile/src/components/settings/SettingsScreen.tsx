@@ -1,4 +1,6 @@
-import { Heart } from "lucide-react-native";
+import { useTheme } from "@/hooks/use-theme";
+import { t } from "../../i18n";
+import { useState } from "react";
 import { Pressable, ScrollView, Switch, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LinearTransition } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -7,7 +9,6 @@ import { StyleSheet } from "react-native-unistyles";
 import { FaGithub } from "@/assets/icons/fa";
 import {
   clampPercent,
-  compactServer,
   connectionLabel,
   rateLimitProgressColor,
   useRemoteConfigPanel,
@@ -16,13 +17,8 @@ import {
 } from "@/components/settings/use-settings-screen";
 import { ThemedText } from "@/components/themed-text";
 import { Icon } from "@/components/ui/icon";
-import {
-  codexRelayRepositoryLabel,
-  codexRelayRepositoryUrl,
-  codexRelaySponsorLabel,
-  codexRelaySponsorUrl,
-} from "@/constants/links";
-import { Colors, Fonts, MaxContentWidth, Spacing } from "@/constants/theme";
+import { codexRelayRepositoryLabel, codexRelayRepositoryUrl } from "@/constants/links";
+import { Fonts, MaxContentWidth, Spacing } from "@/constants/theme";
 import { hotUpdater, hotUpdaterBaseUrl } from "@/lib/hot-updater";
 import { clearHotUpdaterLogs, formatHotUpdaterLogTime } from "@/lib/hot-updater-logs";
 import { formatRateLimitRemaining } from "@/lib/rate-limits";
@@ -34,7 +30,9 @@ const pushNotificationTrackColor = {
 };
 
 export function SettingsScreen() {
+  const theme = useTheme();
   const {
+    addServerAddress,
     appUpdate,
     appUpdateActionLabel,
     appliedBundleSuffix,
@@ -42,14 +40,18 @@ export function SettingsScreen() {
     closeSettings,
     computerName,
     connection,
+    discoveredServerAddresses,
+    editServerAddress,
     hasPairedSession,
     hotUpdaterLogs,
     isAppUpdateActionDisabled,
     isAppUpdatePending,
+    manualServerAddresses,
     openProjectLink,
     pushNotificationPreferences,
     pushNotificationsLoading,
-    pushNotificationsSupported,
+    pushNotificationsAvailable,
+    pushNotificationsUnavailableMessage,
     pushNotificationsUpdating,
     rateLimitRows,
     rateLimitsFetching,
@@ -57,7 +59,6 @@ export function SettingsScreen() {
     revealHotUpdaterLogs,
     selectServerAddress,
     serverUrl,
-    serverUrlCandidates,
     setShowHotUpdaterLogs,
     showHotUpdaterLogs,
     signOut,
@@ -65,24 +66,68 @@ export function SettingsScreen() {
     updatePushNotificationPreference,
   } = useSettingsScreen();
 
+  const [showDiscoveredAddresses, setShowDiscoveredAddresses] = useState(false);
+
+  function renderEditAddress(address: string) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t("Edit address {0}", address)}
+        disabled={Boolean(switchingServerUrl)}
+        onPress={() => editServerAddress(address)}
+        style={({ pressed }) => [styles.editAddress, pressed && styles.pressed]}
+      >
+        <ThemedText type="smallBold">{t("Edit address")}</ThemedText>
+      </Pressable>
+    );
+  }
+
+  function renderAddress(candidate: Parameters<typeof selectServerAddress>[0]) {
+    return (
+      <View key={candidate.url} style={styles.serverAddressRow}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("Use {0}", candidate.url)}
+          disabled={Boolean(switchingServerUrl)}
+          onPress={() => void selectServerAddress(candidate)}
+          style={({ pressed }) => [styles.serverAddressCopy, pressed && styles.pressed]}
+        >
+          <ThemedText type="smallBold" style={styles.serverAddressLabel}>
+            {candidate.label}
+          </ThemedText>
+          <ThemedText type="code" themeColor="textSecondary" style={styles.serverAddressValue}>
+            {candidate.url}
+          </ThemedText>
+        </Pressable>
+        {switchingServerUrl === candidate.url ? (
+          <ThemedText type="small" themeColor="textSecondary">
+            {t("Checking")}
+          </ThemedText>
+        ) : candidate.manual ? (
+          renderEditAddress(candidate.url)
+        ) : null}
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView edges={["top", "left", "right"]} style={styles.screen}>
       <View style={styles.container}>
         <View style={styles.header}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Back to threads"
+            accessibilityLabel={t("Back to threads")}
             onPress={closeSettings}
             style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}
           >
-            <Icon name="back" size={19} tintColor={Colors.dark.text} />
+            <Icon name="back" size={19} tintColor={theme.text} />
           </Pressable>
           <View style={styles.titleGroup}>
             <ThemedText type="smallBold" style={styles.title}>
-              Settings
+              {t("Settings")}
             </ThemedText>
             <ThemedText type="code" themeColor="textSecondary" style={styles.subtitle}>
-              Account
+              {t("Account")}
             </ThemedText>
           </View>
           <View style={styles.headerButtonPlaceholder} />
@@ -95,63 +140,80 @@ export function SettingsScreen() {
         >
           <Animated.View layout={settingsLayoutTransition} style={styles.section}>
             <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>
-              Project
+              {t("Relay connection")}
             </ThemedText>
-            <Animated.View layout={settingsLayoutTransition} style={styles.projectLinkList}>
-              <Pressable
-                accessibilityRole="link"
-                accessibilityLabel="Open Codex Relay GitHub repository"
-                onPress={() => openProjectLink(codexRelayRepositoryUrl)}
-                style={({ pressed }) => [styles.projectLinkRow, pressed && styles.pressed]}
-              >
-                <View style={styles.projectLinkIcon}>
-                  <FaGithub size={17} color={Colors.dark.text} />
-                </View>
-                <View style={styles.projectLinkCopy}>
-                  <ThemedText type="smallBold" style={styles.projectLinkTitle}>
-                    GitHub
-                  </ThemedText>
-                  <ThemedText
-                    type="code"
-                    themeColor="textSecondary"
-                    style={styles.projectLinkSubtitle}
-                    numberOfLines={1}
-                  >
-                    {codexRelayRepositoryLabel}
+            <Animated.View layout={settingsLayoutTransition} style={styles.connectionPanel}>
+              <Animated.View layout={settingsFastLayoutTransition} style={styles.connectionHeader}>
+                <View
+                  style={[
+                    styles.connectionDot,
+                    connection === "connected" && styles.connectionDotConnected,
+                    connection === "offline" && styles.connectionDotOffline,
+                  ]}
+                />
+                <ThemedText type="smallBold" style={styles.connectionTitle} numberOfLines={1}>
+                  {computerName}
+                </ThemedText>
+                <View style={styles.connectionBadge}>
+                  <ThemedText type="code" style={styles.connectionBadgeText}>
+                    {connectionLabel(connection)}
                   </ThemedText>
                 </View>
-                <Icon name="externalLink" size={15} tintColor={Colors.dark.textSecondary} />
-              </Pressable>
-              <Pressable
-                accessibilityRole="link"
-                accessibilityLabel="Open gronxb GitHub Sponsors"
-                onPress={() => openProjectLink(codexRelaySponsorUrl)}
-                style={({ pressed }) => [styles.projectLinkRow, pressed && styles.pressed]}
-              >
-                <View style={[styles.projectLinkIcon, styles.projectLinkIconSponsor]}>
-                  <Heart size={16} color="#FF9FC0" fill="#FF9FC0" />
-                </View>
-                <View style={styles.projectLinkCopy}>
-                  <ThemedText type="smallBold" style={styles.projectLinkTitle}>
-                    Sponsor
-                  </ThemedText>
-                  <ThemedText
-                    type="code"
-                    themeColor="textSecondary"
-                    style={styles.projectLinkSubtitle}
-                    numberOfLines={1}
-                  >
-                    {codexRelaySponsorLabel}
-                  </ThemedText>
-                </View>
-                <Icon name="externalLink" size={15} tintColor={Colors.dark.textSecondary} />
-              </Pressable>
+              </Animated.View>
+              {hasPairedSession ? (
+                <>
+                  <View style={styles.serverAddressList}>
+                    <View style={styles.serverAddressRow}>
+                      <View style={styles.serverAddressCopy}>
+                        <ThemedText type="smallBold" style={styles.serverAddressLabel}>
+                          {t("Current connection address")}
+                        </ThemedText>
+                        <ThemedText
+                          type="code"
+                          themeColor="textSecondary"
+                          style={styles.serverAddressValue}
+                        >
+                          {serverUrl}
+                        </ThemedText>
+                      </View>
+                      {renderEditAddress(serverUrl)}
+                    </View>
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={Boolean(switchingServerUrl)}
+                      onPress={addServerAddress}
+                      style={({ pressed }) => [styles.serverAddressRow, pressed && styles.pressed]}
+                    >
+                      <ThemedText type="smallBold">{t("Add connection address")}</ThemedText>
+                    </Pressable>
+                    {manualServerAddresses.map(renderAddress)}
+                    {discoveredServerAddresses.length > 0 ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityState={{ expanded: showDiscoveredAddresses }}
+                        onPress={() => setShowDiscoveredAddresses((shown) => !shown)}
+                        style={({ pressed }) => [
+                          styles.serverAddressRow,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <ThemedText type="smallBold">{t("Other addresses")}</ThemedText>
+                      </Pressable>
+                    ) : null}
+                    {showDiscoveredAddresses ? discoveredServerAddresses.map(renderAddress) : null}
+                  </View>
+                </>
+              ) : (
+                <ThemedText type="small" themeColor="textSecondary" style={styles.unpairedCopy}>
+                  {t("Pair this device from the main screen to choose a relay server.")}
+                </ThemedText>
+              )}
             </Animated.View>
           </Animated.View>
 
           <Animated.View layout={settingsLayoutTransition} style={styles.section}>
             <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>
-              Usage Limits
+              {t("Usage Limits")}
             </ThemedText>
             <Animated.View layout={settingsLayoutTransition} style={styles.usageCard}>
               {rateLimitRows.length > 0 ? (
@@ -175,7 +237,7 @@ export function SettingsScreen() {
                 >
                   <View style={styles.usageCopy}>
                     <ThemedText type="smallBold" style={styles.usageTitle}>
-                      Rate limits
+                      {t("Rate limits")}
                     </ThemedText>
                     <ThemedText
                       type="small"
@@ -183,8 +245,8 @@ export function SettingsScreen() {
                       style={styles.usageSubtitle}
                     >
                       {rateLimitsFetching
-                        ? "Checking current usage"
-                        : "Unavailable from this runtime"}
+                        ? t("Checking current usage")
+                        : t("Unavailable from this runtime")}
                     </ThemedText>
                   </View>
                 </Animated.View>
@@ -192,134 +254,52 @@ export function SettingsScreen() {
             </Animated.View>
           </Animated.View>
 
-          <Animated.View layout={settingsLayoutTransition} style={styles.section}>
-            <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>
-              Connected Computer
-            </ThemedText>
-            <Animated.View layout={settingsLayoutTransition} style={styles.connectionPanel}>
-              <Animated.View layout={settingsFastLayoutTransition} style={styles.connectionHeader}>
-                <View
-                  style={[
-                    styles.connectionDot,
-                    connection === "connected" && styles.connectionDotConnected,
-                    connection === "offline" && styles.connectionDotOffline,
-                  ]}
-                />
-                <ThemedText type="smallBold" style={styles.connectionTitle} numberOfLines={1}>
-                  {computerName}
-                </ThemedText>
-                <View style={styles.connectionBadge}>
-                  <ThemedText type="code" style={styles.connectionBadgeText}>
-                    {connectionLabel(connection)}
-                  </ThemedText>
-                </View>
-              </Animated.View>
-              {hasPairedSession ? (
-                <>
-                  <InfoLine label="Server" value={compactServer(serverUrl)} />
-                  <View style={styles.serverAddressList}>
-                    {serverUrlCandidates.map((candidate) => {
-                      const isSelected = candidate.url === serverUrl;
-                      const isSwitching = switchingServerUrl === candidate.url;
-                      return (
-                        <Pressable
-                          key={candidate.url}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Use ${compactServer(candidate.url)}`}
-                          disabled={isSelected || Boolean(switchingServerUrl)}
-                          onPress={() => void selectServerAddress(candidate)}
-                          style={({ pressed }) => [
-                            styles.serverAddressRow,
-                            isSelected && styles.serverAddressRowSelected,
-                            pressed && styles.pressed,
-                          ]}
-                        >
-                          <View style={styles.serverAddressCopy}>
-                            <ThemedText type="smallBold" style={styles.serverAddressLabel}>
-                              {candidate.label}
-                            </ThemedText>
-                            <ThemedText
-                              type="code"
-                              themeColor="textSecondary"
-                              style={styles.serverAddressValue}
-                              numberOfLines={1}
-                            >
-                              {compactServer(candidate.url)}
-                            </ThemedText>
-                          </View>
-                          <View
-                            style={[
-                              styles.serverAddressStatus,
-                              isSelected && styles.serverAddressStatusSelected,
-                            ]}
-                          >
-                            <ThemedText
-                              type="code"
-                              style={[
-                                styles.serverAddressStatusText,
-                                isSelected && styles.serverAddressStatusTextSelected,
-                              ]}
-                            >
-                              {isSwitching ? "CHECKING" : isSelected ? "ACTIVE" : "USE"}
-                            </ThemedText>
-                          </View>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </>
-              ) : (
-                <ThemedText type="small" themeColor="textSecondary" style={styles.unpairedCopy}>
-                  Pair this device from the main screen to choose a relay server.
-                </ThemedText>
-              )}
-            </Animated.View>
-          </Animated.View>
-
           {hasPairedSession ? (
             <Animated.View layout={settingsLayoutTransition} style={styles.section}>
               <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>
-                Notifications
+                {t("Notifications")}
               </ThemedText>
               <Animated.View layout={settingsLayoutTransition} style={styles.notificationPanel}>
-                {pushNotificationsSupported ? (
+                {pushNotificationsAvailable ? (
                   <>
                     <ThemedText
                       type="small"
                       themeColor="textSecondary"
                       style={styles.notificationIntro}
                     >
-                      Generic alerts only. Chat content stays on your paired computer.
+                      {t("Generic alerts only. Chat content stays on your paired computer.")}
                     </ThemedText>
                     <PushNotificationToggle
-                      accessibilityLabel="Notify when a Codex turn ends"
+                      accessibilityLabel={t("Notify when a Codex turn ends")}
                       disabled={pushNotificationsLoading || pushNotificationsUpdating}
                       onValueChange={(value) =>
                         void updatePushNotificationPreference("turnTerminal", value)
                       }
-                      subtitle="When Codex completes or fails a turn"
-                      title="Turn complete"
+                      subtitle={t("When Codex completes or fails a turn")}
+                      title={t("Turn complete")}
                       value={pushNotificationPreferences.turnTerminal}
                     />
                     <PushNotificationToggle
-                      accessibilityLabel="Include remaining Codex usage in turn-complete notifications"
+                      accessibilityLabel={t(
+                        "Include remaining Codex usage in turn-complete notifications",
+                      )}
                       disabled={pushNotificationsLoading || pushNotificationsUpdating}
                       onValueChange={(value) =>
                         void updatePushNotificationPreference("includeRemainingUsage", value)
                       }
-                      subtitle="Show the lowest remaining Codex limit after a turn"
-                      title="Remaining usage"
+                      subtitle={t("Show the lowest remaining Codex limit after a turn")}
+                      title={t("Remaining usage")}
                       value={pushNotificationPreferences.includeRemainingUsage}
                     />
                     <PushNotificationToggle
-                      accessibilityLabel="Notify when Codex needs action"
+                      accessibilityLabel={t("Notify when Codex needs action")}
                       disabled={pushNotificationsLoading || pushNotificationsUpdating}
                       onValueChange={(value) =>
                         void updatePushNotificationPreference("actionRequired", value)
                       }
                       showDivider={false}
-                      subtitle="When Codex needs approval or input"
-                      title="Action required"
+                      subtitle={t("When Codex needs approval or input")}
+                      title={t("Action required")}
                       value={pushNotificationPreferences.actionRequired}
                     />
                   </>
@@ -329,7 +309,7 @@ export function SettingsScreen() {
                     themeColor="textSecondary"
                     style={styles.notificationIntro}
                   >
-                    Push notifications are available in the iOS and Android apps.
+                    {pushNotificationsUnavailableMessage}
                   </ThemedText>
                 )}
               </Animated.View>
@@ -339,11 +319,11 @@ export function SettingsScreen() {
           {hasPairedSession ? (
             <Animated.View layout={settingsLayoutTransition} style={styles.section}>
               <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>
-                Session
+                {t("Session")}
               </ThemedText>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Sign out"
+                accessibilityLabel={t("Sign out")}
                 onPress={signOut}
                 style={({ pressed }) => [styles.signOutRow, pressed && styles.pressed]}
               >
@@ -353,14 +333,14 @@ export function SettingsScreen() {
                   </View>
                   <View style={styles.signOutCopy}>
                     <ThemedText type="smallBold" style={styles.signOutTitle}>
-                      Sign out
+                      {t("Sign out")}
                     </ThemedText>
                     <ThemedText
                       type="small"
                       themeColor="textSecondary"
                       style={styles.signOutSubtitle}
                     >
-                      Pair again on this device
+                      {t("Pair again on this device")}
                     </ThemedText>
                   </View>
                 </View>
@@ -380,11 +360,12 @@ export function SettingsScreen() {
                   <Icon
                     name={isAppUpdatePending ? "refresh" : "permissionsAuto"}
                     size={12}
-                    tintColor={isAppUpdatePending ? "#93E1B6" : Colors.dark.textSecondary}
+                    tintColor={isAppUpdatePending ? "#93E1B6" : theme.textSecondary}
                   />
                 </View>
                 <ThemedText type="code" themeColor="textSecondary" style={styles.versionText}>
-                  Version {releaseVersionLabel}
+                  {t("Version")}
+                  {releaseVersionLabel}
                   {appUpdate.status === "checking" ? " · checking" : null}
                   {appUpdate.status === "current" ? " · current" : null}
                   {appUpdate.status === "downloading" ? " · downloading" : null}
@@ -403,7 +384,7 @@ export function SettingsScreen() {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={
-                      appUpdate.status === "ready" ? "Restart app" : "Preparing app update"
+                      appUpdate.status === "ready" ? t("Restart app") : t("Preparing app update")
                     }
                     disabled={isAppUpdateActionDisabled}
                     onPress={() => void applyAppUpdate()}
@@ -442,12 +423,13 @@ export function SettingsScreen() {
               >
                 <View style={styles.hotUpdaterLogHeader}>
                   <ThemedText type="smallBold" style={styles.hotUpdaterLogTitle}>
-                    Logs ({hotUpdater?.getCohort() ?? "none"})
+                    {t("Logs (")}
+                    {hotUpdater?.getCohort() ?? "none"})
                   </ThemedText>
                   <View style={styles.hotUpdaterLogActions}>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel="Clear HotUpdater logs"
+                      accessibilityLabel={t("Clear HotUpdater logs")}
                       onPress={clearHotUpdaterLogs}
                       style={({ pressed }) => [
                         styles.hotUpdaterLogButton,
@@ -455,12 +437,12 @@ export function SettingsScreen() {
                       ]}
                     >
                       <ThemedText type="code" style={styles.hotUpdaterLogButtonText}>
-                        Clear
+                        {t("Clear")}
                       </ThemedText>
                     </Pressable>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel="Hide HotUpdater logs"
+                      accessibilityLabel={t("Hide HotUpdater logs")}
                       onPress={() => setShowHotUpdaterLogs(false)}
                       style={({ pressed }) => [
                         styles.hotUpdaterLogButton,
@@ -468,14 +450,14 @@ export function SettingsScreen() {
                       ]}
                     >
                       <ThemedText type="code" style={styles.hotUpdaterLogButtonText}>
-                        Hide
+                        {t("Hide")}
                       </ThemedText>
                     </Pressable>
                   </View>
                 </View>
                 <View style={styles.hotUpdaterConfigRow}>
                   <ThemedText type="code" style={styles.hotUpdaterConfigLabel}>
-                    Base URL
+                    {t("Base URL")}
                   </ThemedText>
                   <ThemedText
                     type="code"
@@ -512,11 +494,43 @@ export function SettingsScreen() {
                   ))
                 ) : (
                   <ThemedText type="small" themeColor="textSecondary" style={styles.versionMessage}>
-                    No OTA download events captured in this session.
+                    {t("No OTA download events captured in this session.")}
                   </ThemedText>
                 )}
               </Animated.View>
             ) : null}
+          </Animated.View>
+
+          <Animated.View layout={settingsLayoutTransition} style={styles.section}>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>
+              {t("Project")}
+            </ThemedText>
+            <Animated.View layout={settingsLayoutTransition} style={styles.projectLinkList}>
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel={t("Open Codex Relay GitHub repository")}
+                onPress={() => openProjectLink(codexRelayRepositoryUrl)}
+                style={({ pressed }) => [styles.projectLinkRow, pressed && styles.pressed]}
+              >
+                <View style={styles.projectLinkIcon}>
+                  <FaGithub size={17} color={theme.text} />
+                </View>
+                <View style={styles.projectLinkCopy}>
+                  <ThemedText type="smallBold" style={styles.projectLinkTitle}>
+                    GitHub
+                  </ThemedText>
+                  <ThemedText
+                    type="code"
+                    themeColor="textSecondary"
+                    style={styles.projectLinkSubtitle}
+                    numberOfLines={1}
+                  >
+                    {codexRelayRepositoryLabel}
+                  </ThemedText>
+                </View>
+                <Icon name="externalLink" size={15} tintColor={theme.textSecondary} />
+              </Pressable>
+            </Animated.View>
           </Animated.View>
         </ScrollView>
       </View>
@@ -603,7 +617,7 @@ function RateLimitProgressRow({
             style={styles.usageSubtitle}
             numberOfLines={1}
           >
-            {remainingText} left
+            {remainingText} {t("left")}
           </ThemedText>
         </View>
         <View style={[styles.usagePercentBadge, { borderColor: progressColor }]}>
@@ -618,7 +632,7 @@ function RateLimitProgressRow({
           max: 100,
           min: 0,
           now: clampedUsedPercent,
-          text: `${clampedUsedPercent}% used`,
+          text: t("{0}% used", clampedUsedPercent),
         }}
         style={styles.usageProgressTrack}
       >
@@ -631,38 +645,14 @@ function RateLimitProgressRow({
       </View>
       <View style={styles.usageMetaRow}>
         <ThemedText type="code" themeColor="textSecondary" style={styles.usageMetaText}>
-          Used {clampedUsedPercent}%
+          {t("Used")}
+          {clampedUsedPercent}%
         </ThemedText>
         <ThemedText type="code" themeColor="textSecondary" style={styles.usageMetaText}>
-          Remaining {clampedRemainingPercent}%
+          {t("Remaining")}
+          {clampedRemainingPercent}%
         </ThemedText>
       </View>
-    </Animated.View>
-  );
-}
-
-function InfoLine({
-  label,
-  numberOfLines = 1,
-  value,
-}: {
-  label: string;
-  numberOfLines?: number;
-  value: string;
-}) {
-  return (
-    <Animated.View
-      entering={settingsEnterTransition}
-      exiting={settingsExitTransition}
-      layout={settingsLayoutTransition}
-      style={styles.infoLine}
-    >
-      <ThemedText type="small" themeColor="textSecondary" style={styles.infoLineLabel}>
-        {label}
-      </ThemedText>
-      <ThemedText type="code" style={styles.infoLineValue} numberOfLines={numberOfLines}>
-        {value}
-      </ThemedText>
     </Animated.View>
   );
 }
@@ -678,13 +668,13 @@ function RemoteConfigPanel({ remoteConfig }: { remoteConfig: HotUpdaterRemoteCon
         </ThemedText>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Fetch Remote Config now"
+          accessibilityLabel={t("Fetch Remote Config now")}
           disabled={fetching}
           onPress={() => void fetchNow()}
           style={({ pressed }) => [styles.hotUpdaterLogButton, pressed && styles.pressed]}
         >
           <ThemedText type="code" style={styles.hotUpdaterLogButtonText}>
-            {fetching ? "Fetching" : "Fetch"}
+            {fetching ? t("Fetching") : t("Fetch")}
           </ThemedText>
         </Pressable>
       </View>
@@ -716,10 +706,10 @@ const settingsFastLayoutTransition = LinearTransition.duration(120);
 const settingsEnterTransition = FadeIn.duration(120);
 const settingsExitTransition = FadeOut.duration(90);
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   screen: {
     alignItems: "center",
-    backgroundColor: Colors.dark.background,
+    backgroundColor: theme.background,
     flex: 1,
   },
   container: {
@@ -737,8 +727,8 @@ const styles = StyleSheet.create({
   },
   headerButton: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-    borderColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: theme.subtle,
+    borderColor: theme.border,
     borderRadius: 20,
     borderWidth: 1,
     height: 40,
@@ -784,8 +774,8 @@ const styles = StyleSheet.create({
     opacity: 0.68,
   },
   projectLinkList: {
-    backgroundColor: Colors.dark.backgroundElement,
-    borderColor: "rgba(255, 255, 255, 0.09)",
+    backgroundColor: theme.backgroundElement,
+    borderColor: theme.border,
     borderRadius: 8,
     borderWidth: 1,
     gap: 7,
@@ -793,8 +783,8 @@ const styles = StyleSheet.create({
   },
   projectLinkRow: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
-    borderColor: "rgba(255, 255, 255, 0.08)",
+    backgroundColor: theme.subtle,
+    borderColor: theme.border,
     borderRadius: 7,
     borderWidth: 1,
     flexDirection: "row",
@@ -805,18 +795,14 @@ const styles = StyleSheet.create({
   },
   projectLinkIcon: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
-    borderColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: theme.subtle,
+    borderColor: theme.border,
     borderRadius: 15,
     borderWidth: 1,
     flexShrink: 0,
     height: 30,
     justifyContent: "center",
     width: 30,
-  },
-  projectLinkIconSponsor: {
-    backgroundColor: "rgba(255, 159, 192, 0.12)",
-    borderColor: "rgba(255, 159, 192, 0.22)",
   },
   projectLinkCopy: {
     flex: 1,
@@ -886,8 +872,8 @@ const styles = StyleSheet.create({
     lineHeight: 15,
   },
   hotUpdaterLogPanel: {
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
-    borderColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: theme.subtle,
+    borderColor: theme.border,
     borderRadius: 8,
     borderWidth: 1,
     gap: Spacing.two,
@@ -909,14 +895,14 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
   },
   hotUpdaterLogButton: {
-    borderColor: "rgba(255, 255, 255, 0.12)",
+    borderColor: theme.border,
     borderRadius: 6,
     borderWidth: 1,
     paddingHorizontal: 7,
     paddingVertical: 4,
   },
   hotUpdaterLogButtonText: {
-    color: Colors.dark.textSecondary,
+    color: theme.textSecondary,
     fontFamily: Fonts.monoMedium,
     fontSize: 9,
     lineHeight: 12,
@@ -941,7 +927,7 @@ const styles = StyleSheet.create({
     lineHeight: 12,
   },
   hotUpdaterConfigValue: {
-    color: Colors.dark.text,
+    color: theme.text,
     fontFamily: Fonts.monoMedium,
     fontSize: 10,
     lineHeight: 14,
@@ -950,19 +936,19 @@ const styles = StyleSheet.create({
     color: "#FFB4A8",
   },
   hotUpdaterLogRow: {
-    borderTopColor: "rgba(255, 255, 255, 0.08)",
+    borderTopColor: theme.border,
     borderTopWidth: 1,
     gap: 2,
     paddingTop: Spacing.two,
   },
   hotUpdaterLogMeta: {
-    color: Colors.dark.textSecondary,
+    color: theme.textSecondary,
     fontFamily: Fonts.monoMedium,
     fontSize: 9,
     lineHeight: 12,
   },
   hotUpdaterLogMessage: {
-    color: Colors.dark.text,
+    color: theme.text,
     fontSize: 12,
     lineHeight: 16,
   },
@@ -971,16 +957,16 @@ const styles = StyleSheet.create({
     lineHeight: 14,
   },
   connectionPanel: {
-    backgroundColor: Colors.dark.backgroundElement,
-    borderColor: "rgba(255, 255, 255, 0.09)",
+    backgroundColor: theme.backgroundElement,
+    borderColor: theme.border,
     borderRadius: 8,
     borderWidth: 1,
     gap: Spacing.two,
     padding: Spacing.three,
   },
   notificationPanel: {
-    backgroundColor: Colors.dark.backgroundElement,
-    borderColor: "rgba(255, 255, 255, 0.09)",
+    backgroundColor: theme.backgroundElement,
+    borderColor: theme.border,
     borderRadius: 8,
     borderWidth: 1,
     overflow: "hidden",
@@ -1000,7 +986,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   notificationRowDivider: {
-    borderBottomColor: "rgba(255, 255, 255, 0.08)",
+    borderBottomColor: theme.border,
     borderBottomWidth: 1,
   },
   notificationCopy: {
@@ -1017,8 +1003,8 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   usageCard: {
-    backgroundColor: Colors.dark.backgroundElement,
-    borderColor: "rgba(255, 255, 255, 0.09)",
+    backgroundColor: theme.backgroundElement,
+    borderColor: theme.border,
     borderRadius: 8,
     borderWidth: 1,
     overflow: "hidden",
@@ -1030,7 +1016,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   usageRowDivider: {
-    borderBottomColor: "rgba(255, 255, 255, 0.08)",
+    borderBottomColor: theme.border,
     borderBottomWidth: 1,
   },
   usageHeader: {
@@ -1053,7 +1039,7 @@ const styles = StyleSheet.create({
   },
   usagePercentBadge: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    backgroundColor: theme.subtle,
     borderRadius: 6,
     borderWidth: 1,
     flexShrink: 0,
@@ -1068,7 +1054,7 @@ const styles = StyleSheet.create({
     lineHeight: 15,
   },
   usageProgressTrack: {
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    backgroundColor: theme.subtle,
     borderRadius: 999,
     height: 8,
     overflow: "hidden",
@@ -1118,8 +1104,8 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   connectionBadge: {
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
-    borderColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: theme.subtle,
+    borderColor: theme.border,
     borderRadius: 6,
     borderWidth: 1,
     flexShrink: 0,
@@ -1127,23 +1113,10 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   connectionBadgeText: {
-    color: Colors.dark.textSecondary,
+    color: theme.textSecondary,
     fontFamily: Fonts.monoMedium,
     fontSize: 9,
     lineHeight: 12,
-  },
-  infoLine: {
-    gap: 2,
-    minHeight: 20,
-  },
-  infoLineLabel: {
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  infoLineValue: {
-    color: Colors.dark.text,
-    fontSize: 12,
-    lineHeight: 16,
   },
   serverAddressList: {
     gap: 7,
@@ -1151,8 +1124,8 @@ const styles = StyleSheet.create({
   },
   serverAddressRow: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
-    borderColor: "rgba(255, 255, 255, 0.08)",
+    backgroundColor: theme.subtle,
+    borderColor: theme.border,
     borderRadius: 7,
     borderWidth: 1,
     flexDirection: "row",
@@ -1161,14 +1134,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
-  serverAddressRowSelected: {
-    backgroundColor: "rgba(44, 163, 111, 0.12)",
-    borderColor: "rgba(147, 225, 182, 0.24)",
-  },
   serverAddressCopy: {
     flex: 1,
     gap: 2,
     minWidth: 0,
+  },
+  editAddress: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 44,
+    minWidth: 44,
   },
   serverAddressLabel: {
     fontSize: 13,
@@ -1177,31 +1152,6 @@ const styles = StyleSheet.create({
   serverAddressValue: {
     fontSize: 11,
     lineHeight: 15,
-  },
-  serverAddressStatus: {
-    alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
-    borderColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: 6,
-    borderWidth: 1,
-    flexShrink: 0,
-    justifyContent: "center",
-    minWidth: 62,
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-  },
-  serverAddressStatusSelected: {
-    backgroundColor: "rgba(44, 163, 111, 0.16)",
-    borderColor: "rgba(147, 225, 182, 0.28)",
-  },
-  serverAddressStatusText: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.monoMedium,
-    fontSize: 9,
-    lineHeight: 12,
-  },
-  serverAddressStatusTextSelected: {
-    color: "#93E1B6",
   },
   signOutRow: {
     backgroundColor: "rgba(216, 79, 79, 0.08)",
@@ -1244,4 +1194,4 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.7,
   },
-});
+}));

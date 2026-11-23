@@ -1,3 +1,5 @@
+import { useTheme } from "@/hooks/use-theme";
+import { t } from "../../i18n";
 import type { ChatMessage } from "codex-relay/api-schema";
 import {
   type LegendListRef,
@@ -6,7 +8,7 @@ import {
   type MaintainVisibleContentPositionConfig,
 } from "@legendapp/list/react-native";
 import { KeyboardAwareLegendList } from "@legendapp/list/keyboard";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import Animated, {
@@ -21,11 +23,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { Icon } from "@/components/ui/icon";
-import { Colors, Spacing } from "@/constants/theme";
+import { Spacing } from "@/constants/theme";
 import { hapticSelection } from "@/lib/haptics";
 
 import { MessageBubble } from "./MessageBubble";
 import { messageItemType, messageKeyExtractor } from "./timeline-message-items";
+import { TurnActivityRow } from "./TurnActivityRow";
+import { buildTimelineRows, type TimelineRow } from "./turn-activity";
 import type { WorkspaceMarkdownPreviewTarget } from "./workspace-preview/markdown-target";
 import { RunningFooter } from "./RunningFooter";
 
@@ -40,7 +44,7 @@ const MAINTAIN_SCROLL_AT_END: MaintainScrollAtEndOptions = {
     layout: true,
   },
 };
-const MAINTAIN_VISIBLE_CONTENT_POSITION: MaintainVisibleContentPositionConfig<ChatMessage> = {
+const MAINTAIN_VISIBLE_CONTENT_POSITION: MaintainVisibleContentPositionConfig<TimelineRow> = {
   data: false,
   size: true,
 };
@@ -74,10 +78,11 @@ export function MessageTimeline({
   onOpenMarkdownAttachment?: (target: WorkspaceMarkdownPreviewTarget) => void;
   threadId?: string;
 }) {
+  const theme = useTheme();
   const listRef = useRef<LegendListRef | null>(null);
   const removeAtEndListenerRef = useRef<(() => void) | null>(null);
   const { bottom } = useSafeAreaInsets();
-  const rows = messages;
+  const rows = useMemo(() => buildTimelineRows(messages, isRunning), [messages, isRunning]);
   const timelineKey = threadId ?? "no-thread";
   const [isAtEnd, setIsAtEnd] = useState(true);
   const [settledTimelineKey, setSettledTimelineKey] = useState<string | undefined>(undefined);
@@ -140,15 +145,29 @@ export function MessageTimeline({
   }, [contentRevealProgress, showLoadingConversation]);
 
   const renderMessage = useCallback(
-    ({ item }: LegendListRenderItemProps<ChatMessage>) => (
-      <MessageBubble
-        message={item}
-        onMessageCopied={onMessageCopied}
-        onMessageRewind={onMessageRewind}
-        onOpenMarkdownAttachment={onOpenMarkdownAttachment}
-      />
-    ),
-    [onMessageCopied, onMessageRewind, onOpenMarkdownAttachment],
+    ({ item, index }: LegendListRenderItemProps<TimelineRow>) =>
+      item.type === "activity" ? (
+        <TurnActivityRow
+          activity={item.activity}
+          onMessageCopied={onMessageCopied}
+          onOpenMarkdownAttachment={onOpenMarkdownAttachment}
+        />
+      ) : (
+        <MessageBubble
+          followsTurnActivity={
+            item.message.role === "assistant" &&
+            item.message.kind === "chat" &&
+            item.message.details?.delivery !== "async" &&
+            rows[index - 1]?.type === "activity"
+          }
+          message={item.message}
+          isThreadRunning={isRunning && item.message.kind === "thinking"}
+          onMessageCopied={onMessageCopied}
+          onMessageRewind={onMessageRewind}
+          onOpenMarkdownAttachment={onOpenMarkdownAttachment}
+        />
+      ),
+    [isRunning, onMessageCopied, onMessageRewind, onOpenMarkdownAttachment, rows],
   );
   const handleTimelineLoad = useCallback(() => {
     requestAnimationFrame(() => {
@@ -178,7 +197,7 @@ export function MessageTimeline({
           <Animated.View style={[styles.transitionScene, timelineContentStyle]}>
             <View style={styles.empty}>
               <ThemedText type="small" themeColor="textSecondary" style={styles.emptyText}>
-                Send a message to start the conversation.
+                {t("Send a message to start the conversation.")}
               </ThemedText>
             </View>
           </Animated.View>
@@ -194,9 +213,15 @@ export function MessageTimeline({
               data={rows}
               estimatedItemSize={MESSAGE_ESTIMATED_ITEM_SIZE}
               freeze={keyboardLayoutFrozen}
-              getItemType={messageItemType}
+              getItemType={(row) =>
+                row.type === "activity" ? "activity" : messageItemType(row.message)
+              }
               initialScrollAtEnd
-              keyExtractor={messageKeyExtractor}
+              keyExtractor={(row) =>
+                row.type === "activity"
+                  ? `activity:${row.activity.id}`
+                  : messageKeyExtractor(row.message)
+              }
               renderItem={renderMessage}
               contentContainerStyle={styles.content}
               keyboardDismissMode="interactive"
@@ -226,13 +251,13 @@ export function MessageTimeline({
           style={styles.scrollToEndContainer}
         >
           <Pressable
-            accessibilityLabel="Scroll to latest message"
+            accessibilityLabel={t("Scroll to latest message")}
             accessibilityRole="button"
             hitSlop={8}
             onPress={handleScrollToEnd}
             style={({ pressed }) => [styles.scrollToEndButton, pressed && styles.pressed]}
           >
-            <Icon name="expand" size={18} tintColor={Colors.dark.text} />
+            <Icon name="expand" size={18} tintColor={theme.text} />
           </Pressable>
         </Animated.View>
       ) : null}
@@ -251,17 +276,18 @@ export function MessageTimeline({
 }
 
 function LoadingConversation() {
+  const theme = useTheme();
   return (
     <View style={styles.empty} accessibilityRole="progressbar">
-      <ActivityIndicator color={Colors.dark.textSecondary} />
+      <ActivityIndicator color={theme.textSecondary} />
       <ThemedText type="small" themeColor="textSecondary" style={styles.emptyText}>
-        Loading conversation…
+        {t("Loading conversation…")}
       </ThemedText>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   content: {
     paddingBottom: Spacing.two,
     paddingHorizontal: Spacing.four,
@@ -282,15 +308,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listEndPad: {
-    height: Spacing.two,
+    height: Spacing.one,
   },
   pressed: {
     opacity: 0.7,
   },
   scrollToEndButton: {
     alignItems: "center",
-    backgroundColor: "rgba(42, 42, 42, 0.94)",
-    borderColor: "rgba(255, 255, 255, 0.12)",
+    backgroundColor: theme.backgroundElement,
+    borderColor: theme.border,
     borderCurve: "continuous",
     borderRadius: 18,
     borderWidth: 1,
@@ -317,4 +343,4 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
   },
-});
+}));

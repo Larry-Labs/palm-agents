@@ -1,8 +1,8 @@
 import { StyleSheet } from "react-native-unistyles";
 
-import { Colors, MaxContentWidth, Spacing } from "@/constants/theme";
+import { MaxContentWidth } from "@/constants/theme";
 
-export const chatShellStyles = StyleSheet.create({
+export const chatShellStyles = StyleSheet.create((theme) => ({
   chatBody: {
     flex: 1,
     minHeight: 0,
@@ -14,7 +14,7 @@ export const chatShellStyles = StyleSheet.create({
     zIndex: 8,
   },
   container: {
-    backgroundColor: Colors.dark.background,
+    backgroundColor: theme.background,
     flex: 1,
     flexDirection: "row",
     justifyContent: "center",
@@ -24,13 +24,12 @@ export const chatShellStyles = StyleSheet.create({
     maxWidth: MaxContentWidth,
   },
   shell: {
-    backgroundColor: Colors.dark.background,
+    backgroundColor: theme.background,
     flex: 1,
     gap: 0,
-    paddingTop: Spacing.one,
   },
   timeline: {
     flex: 1,
     minHeight: 0,
   },
-});
+}));

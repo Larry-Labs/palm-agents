@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { LegendList, type LegendListRenderItemProps } from "@legendapp/list/react-native";
 import { useSelector } from "@legendapp/state/react";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
@@ -27,6 +28,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
+import { appName } from "@/constants/brand";
 import { codexRelayRepositoryUrl } from "@/constants/links";
 import { Fonts } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
@@ -314,8 +316,8 @@ export function ThreadDrawerContent(props: ThreadDrawerContentProps) {
     } catch (caught) {
       setHasPairedSession(hasCodexRelaySession());
       Alert.alert(
-        "Couldn’t rename chat",
-        caught instanceof Error ? caught.message : "Unable to rename this chat.",
+        t("Couldn’t rename chat"),
+        caught instanceof Error ? caught.message : t("Unable to rename this chat."),
       );
     }
   }, [canMutateAppServerThreads, renameDraft, renameThreadMutation, threadToRename]);
@@ -449,11 +451,11 @@ export function ThreadDrawerContent(props: ThreadDrawerContentProps) {
 
   const emptyList = normalizedSearchQuery ? (
     <Animated.View style={[styles.emptySearchState, emptySearchAnimatedStyle]}>
-      <Text style={styles.emptySearchText}>No matching conversations</Text>
+      <Text style={styles.emptySearchText}>{t("No matching conversations")}</Text>
     </Animated.View>
   ) : (
     <View style={styles.emptySearchState}>
-      <Text style={styles.emptySearchText}>No chats in this workspace</Text>
+      <Text style={styles.emptySearchText}>{t("No chats in this workspace")}</Text>
     </View>
   );
 
@@ -498,8 +500,10 @@ export function ThreadDrawerContent(props: ThreadDrawerContentProps) {
         onBack={threadToRename ? returnToThreadActions : undefined}
         onClose={closeThreadActions}
         scrollable={false}
-        subtitle={threadToRename ? "Choose a clear title for this chat." : threadWithActions?.title}
-        title={threadToRename ? "Rename chat" : "Chat actions"}
+        subtitle={
+          threadToRename ? t("Choose a clear title for this chat.") : threadWithActions?.title
+        }
+        title={threadToRename ? t("Rename chat") : t("Chat actions")}
         visible={Boolean(threadWithActions)}
       >
         {threadToRename ? (
@@ -511,50 +515,47 @@ export function ThreadDrawerContent(props: ThreadDrawerContentProps) {
               editable={!renameThreadMutation.isPending}
               onChangeText={setRenameDraft}
               onSubmitEditing={() => void saveRenamedThread()}
-              placeholder="Chat title"
+              placeholder={t("Chat title")}
               placeholderTextColor={theme.textSecondary}
               returnKeyType="done"
               selectionColor="rgba(124, 199, 255, 0.28)"
-              style={[
-                styles.renameSheetInput,
-                { borderColor: "rgba(255, 255, 255, 0.14)", color: theme.text },
-              ]}
+              style={[styles.renameSheetInput, { borderColor: theme.border, color: theme.text }]}
               value={renameDraft}
             />
             <View style={styles.renameSheetActions}>
               <Button
-                accessibilityLabel="Cancel chat rename"
+                accessibilityLabel={t("Cancel chat rename")}
                 disabled={renameThreadMutation.isPending}
                 onPress={returnToThreadActions}
                 size="default"
                 variant="ghost"
               >
-                <Text style={{ color: theme.textSecondary }}>Cancel</Text>
+                <Text style={{ color: theme.textSecondary }}>{t("Cancel")}</Text>
               </Button>
               <Button
-                accessibilityLabel="Save chat name"
+                accessibilityLabel={t("Save chat name")}
                 disabled={!canSaveRenamedThread}
                 onPress={() => void saveRenamedThread()}
                 size="default"
               >
-                <Text>Save</Text>
+                <Text>{t("Save")}</Text>
               </Button>
             </View>
           </View>
         ) : threadWithActions ? (
           <>
             <SheetActionRow
-              accessibilityLabel={threadWithActionsIsPinned ? "Unpin chat" : "Pin chat"}
+              accessibilityLabel={threadWithActionsIsPinned ? t("Unpin chat") : t("Pin chat")}
               icon="pin"
               onPress={() => handleTogglePinnedThread(threadWithActions)}
-              title={threadWithActionsIsPinned ? "Unpin chat" : "Pin chat"}
+              title={threadWithActionsIsPinned ? t("Unpin chat") : t("Pin chat")}
             />
             {canMutateAppServerThreads ? (
               <SheetActionRow
-                accessibilityLabel="Rename chat"
+                accessibilityLabel={t("Rename chat")}
                 icon="newChat"
                 onPress={openRenameThread}
-                title="Rename chat"
+                title={t("Rename chat")}
               />
             ) : null}
           </>
@@ -563,7 +564,7 @@ export function ThreadDrawerContent(props: ThreadDrawerContentProps) {
       {props.showResizeHandle ? (
         <GestureDetector gesture={sidebarResizeGesture}>
           <Animated.View
-            accessibilityLabel="Resize threads sidebar"
+            accessibilityLabel={t("Resize threads sidebar")}
             style={styles.sidebarResizeHandle}
           >
             <View style={styles.sidebarResizeGrip} />
@@ -643,7 +644,7 @@ function useThreadDrawerActions({
         setThreadRunningState(queryClient, selectedThread?.id ?? threadId, false);
         setConnection(
           "offline",
-          caught instanceof Error ? caught.message : "Unable to load this Codex thread.",
+          caught instanceof Error ? caught.message : t("Unable to load this Codex thread."),
         );
       } finally {
         setThreadMessagesLoading(threadId, false);
@@ -685,7 +686,7 @@ function useThreadDrawerActions({
         syncPairedSessionState();
         setConnection(
           "offline",
-          caught instanceof Error ? caught.message : "Unable to load workspace folders.",
+          caught instanceof Error ? caught.message : t("Unable to load workspace folders."),
         );
       } finally {
         dispatchUi({ type: "set-loading-workspaces", value: false });
@@ -709,7 +710,7 @@ function useThreadDrawerActions({
       dispatchUi({ type: "set-creating-thread", value: true });
       try {
         const response = await createThreadMutateAsync({
-          title: "New chat",
+          title: t("New chat"),
           workspacePath: selectedWorkspacePath,
         });
         setThreadDetailState(queryClient, response.thread, response.messages);
@@ -722,7 +723,9 @@ function useThreadDrawerActions({
         syncPairedSessionState();
         setConnection(
           "offline",
-          caught instanceof Error ? caught.message : "Unable to create a new Codex Relay thread.",
+          caught instanceof Error
+            ? caught.message
+            : t("Unable to create a new Codex Relay thread."),
         );
       } finally {
         dispatchUi({ type: "set-creating-thread", value: false });
@@ -769,7 +772,7 @@ function useThreadDrawerActions({
       syncPairedSessionState();
       setConnection(
         "offline",
-        caught instanceof Error ? caught.message : "Unable to refresh projects.",
+        caught instanceof Error ? caught.message : t("Unable to refresh projects."),
       );
     } finally {
       dispatchUi({ type: "set-refreshing-projects", value: false });
@@ -792,7 +795,7 @@ function useThreadDrawerActions({
         syncPairedSessionState();
         setConnection(
           "offline",
-          caught instanceof Error ? caught.message : "Unable to archive this Codex thread.",
+          caught instanceof Error ? caught.message : t("Unable to archive this Codex thread."),
         );
       }
     },
@@ -802,14 +805,18 @@ function useThreadDrawerActions({
   const confirmArchiveThread = useCallback(
     (thread: ThreadSummary) => {
       hapticSelection();
-      Alert.alert("Archive thread?", `"${thread.title}" will be removed from this workspace.`, [
-        { style: "cancel", text: "Cancel" },
-        {
-          onPress: () => void archiveThread(thread.id),
-          style: "destructive",
-          text: "Archive",
-        },
-      ]);
+      Alert.alert(
+        t("Archive thread?"),
+        t('"{0}" will be removed from this workspace.', thread.title),
+        [
+          { style: "cancel", text: t("Cancel") },
+          {
+            onPress: () => void archiveThread(thread.id),
+            style: "destructive",
+            text: t("Archive"),
+          },
+        ],
+      );
     },
     [archiveThread],
   );
@@ -858,7 +865,7 @@ function DrawerFooter({
     <View style={[styles.footerBlock, { paddingBottom: Math.max(bottomInset, 8) }]}>
       <Pressable
         accessibilityRole="link"
-        accessibilityLabel="Open Codex Relay GitHub repository"
+        accessibilityLabel={t("Open Codex Relay GitHub repository")}
         onPress={() => void Linking.openURL(codexRelayRepositoryUrl)}
         style={styles.repositoryFooter}
       >
@@ -868,14 +875,14 @@ function DrawerFooter({
               <FaGithub size={16} color={theme.text} />
             </View>
             <View style={[styles.repositoryFooterCopy, pressed && styles.drawerPressedContent]}>
-              <Text style={styles.repositoryFooterTitle}>Codex Relay on GitHub</Text>
+              <Text style={styles.repositoryFooterTitle}>{t("Codex Relay on GitHub")}</Text>
             </View>
           </>
         )}
       </Pressable>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Settings"
+        accessibilityLabel={t("Settings")}
         onPress={onOpenSettings}
         style={styles.footer}
       >
@@ -885,7 +892,7 @@ function DrawerFooter({
               <Icon name="settings" size={16} tintColor={theme.text} />
             </View>
             <Text style={[styles.footerText, pressed && styles.drawerPressedContent]}>
-              Settings
+              {t("Settings")}
             </Text>
           </>
         )}
@@ -933,7 +940,7 @@ const DrawerRowItem = memo(function DrawerRowItem({
         <View style={styles.rowIconSlot}>
           <Icon name="pin" size={15} tintColor={theme.textSecondary} />
         </View>
-        <Text style={styles.projectTitle}>Pinned</Text>
+        <Text style={styles.projectTitle}>{t("Pinned")}</Text>
       </View>
     );
   }
@@ -947,7 +954,7 @@ const DrawerRowItem = memo(function DrawerRowItem({
         <Text style={styles.projectTitle}>{item.title}</Text>
         <View style={styles.projectActions}>
           <Button
-            accessibilityLabel={`Create new chat in ${item.title}`}
+            accessibilityLabel={t("Create new chat in {0}", item.title)}
             disabled={isCreatingThread}
             onPress={() => {
               hapticSelection();
@@ -968,14 +975,16 @@ const DrawerRowItem = memo(function DrawerRowItem({
     return (
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Show ${item.hiddenCount} more conversations`}
+        accessibilityLabel={t("Show {0} more conversations", item.hiddenCount)}
         onPress={() => onToggleProject(item.projectKey)}
         style={styles.moreRow}
       >
         {({ pressed }) => (
           <>
             <View style={styles.rowIconSlot} />
-            <Text style={[styles.moreText, pressed && styles.drawerPressedContent]}>Show more</Text>
+            <Text style={[styles.moreText, pressed && styles.drawerPressedContent]}>
+              {t("Show more")}
+            </Text>
           </>
         )}
       </Pressable>
@@ -988,12 +997,12 @@ const DrawerRowItem = memo(function DrawerRowItem({
     <View style={[styles.thread, selected && styles.threadSelected]}>
       <Pressable
         accessibilityActions={[
-          { label: pinned ? "Unpin chat" : "Pin chat", name: "toggle-pin" },
-          ...(canRenameThread ? [{ label: "Rename chat", name: "rename" }] : []),
+          { label: pinned ? t("Unpin chat") : t("Pin chat"), name: "toggle-pin" },
+          ...(canRenameThread ? [{ label: t("Rename chat"), name: "rename" }] : []),
         ]}
-        accessibilityHint="Long press for chat actions"
+        accessibilityHint={t("Long press for chat actions")}
         accessibilityRole="button"
-        accessibilityLabel={`Open thread ${item.thread.title}`}
+        accessibilityLabel={t("Open thread {0}", item.thread.title)}
         accessibilityState={{ selected }}
         delayLongPress={350}
         onAccessibilityAction={(event) => {
@@ -1030,7 +1039,7 @@ const DrawerRowItem = memo(function DrawerRowItem({
         )}
       </Pressable>
       <Button
-        accessibilityLabel={`Archive thread ${item.thread.title}`}
+        accessibilityLabel={t("Archive thread {0}", item.thread.title)}
         disabled={archiveThreadPending}
         onPress={() => onArchiveThread(item.thread)}
         size="icon"
@@ -1123,10 +1132,10 @@ function DrawerListHeader({
   return (
     <View style={styles.header}>
       <View style={styles.brandRow}>
-        <Text style={styles.brandText}>Codex Relay</Text>
+        <Text style={styles.brandText}>{appName}</Text>
         {showCloseButton ? (
           <Button
-            accessibilityLabel="Close menu"
+            accessibilityLabel={t("Close menu")}
             onPress={onCloseMenu}
             size="icon"
             variant="ghost"
@@ -1139,11 +1148,11 @@ function DrawerListHeader({
       <View style={styles.searchShell}>
         <Icon name="search" size={14} tintColor={theme.textSecondary} />
         <TextInput
-          accessibilityLabel="Search conversations"
+          accessibilityLabel={t("Search conversations")}
           autoCapitalize="none"
           autoCorrect={false}
           onChangeText={onSearchChange}
-          placeholder="Search conversations"
+          placeholder={t("Search conversations")}
           placeholderTextColor={theme.textSecondary}
           returnKeyType="search"
           selectionColor={theme.text}
@@ -1156,7 +1165,7 @@ function DrawerListHeader({
         >
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Clear conversation search"
+            accessibilityLabel={t("Clear conversation search")}
             disabled={!searchQuery}
             hitSlop={8}
             onPress={onSearchClear}
@@ -1174,7 +1183,7 @@ function DrawerListHeader({
       ) : null}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="New Chat"
+        accessibilityLabel={t("New Chat")}
         onPress={onNewChat}
         style={styles.newChatRow}
       >
@@ -1184,7 +1193,7 @@ function DrawerListHeader({
               <Icon name="newChat" size={14} tintColor={theme.text} />
             </View>
             <Text style={[styles.newChatText, pressed && styles.drawerPressedContent]}>
-              New Chat
+              {t("New Chat")}
             </Text>
           </>
         )}
@@ -1205,10 +1214,10 @@ function DrawerListHeader({
         )}
       </Pressable>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Projects</Text>
+        <Text style={styles.sectionTitle}>{t("Projects")}</Text>
         <View style={styles.sectionActions}>
           <Button
-            accessibilityLabel="Refresh projects"
+            accessibilityLabel={t("Refresh projects")}
             disabled={isRefreshingProjects}
             onPress={onRefreshProjects}
             size="icon"
@@ -1257,21 +1266,21 @@ function WorkspaceBrowserModal({
         <View style={styles.workspaceDrawerPanel}>
           <View style={styles.workspaceDrawerHeader}>
             <View style={styles.workspaceDrawerTitleBlock}>
-              <Text style={styles.workspaceDrawerTitle}>New Chat</Text>
+              <Text style={styles.workspaceDrawerTitle}>{t("New Chat")}</Text>
               <Text style={styles.workspaceDrawerSubtitle} numberOfLines={1}>
                 {currentBrowserPath ?? "codex-relay"}
               </Text>
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Close folder picker"
+              accessibilityLabel={t("Close folder picker")}
               onPress={onClose}
               style={({ pressed }) => [
                 styles.workspaceCloseButton,
                 pressed && styles.drawerPressedContent,
               ]}
             >
-              <Text style={styles.workspaceCloseText}>Close</Text>
+              <Text style={styles.workspaceCloseText}>{t("Close")}</Text>
             </Pressable>
           </View>
 
@@ -1279,7 +1288,7 @@ function WorkspaceBrowserModal({
             <View style={styles.workspaceToolbar}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Go to parent folder"
+                accessibilityLabel={t("Go to parent folder")}
                 accessibilityState={{
                   disabled: !workspaceBrowser?.parentPath || isLoadingWorkspaces,
                 }}
@@ -1309,11 +1318,11 @@ function WorkspaceBrowserModal({
             <LegendList
               ListEmptyComponent={
                 isLoadingWorkspaces && !workspaceBrowser ? (
-                  <Text style={styles.workspaceEmptyText}>Loading folders…</Text>
+                  <Text style={styles.workspaceEmptyText}>{t("Loading folders…")}</Text>
                 ) : (
                   <View style={styles.workspaceEmptyState}>
                     <Icon name="folder" size={18} tintColor={theme.textSecondary} />
-                    <Text style={styles.workspaceEmptyText}>No folders here</Text>
+                    <Text style={styles.workspaceEmptyText}>{t("No folders here")}</Text>
                   </View>
                 )
               }
@@ -1337,12 +1346,12 @@ function WorkspaceBrowserModal({
 
           <View style={styles.workspaceDrawerFooter}>
             <SheetActionRow
-              accessibilityLabel="Create chat in current folder"
+              accessibilityLabel={t("Create chat in current folder")}
               disabled={isCreatingThread || isLoadingWorkspaces || !currentBrowserPath}
               icon="newChat"
               onPress={() => void onCreateThread(currentBrowserPath)}
               selected
-              title="New Chat Here"
+              title={t("New Chat Here")}
               subtitle={workspaceName(currentBrowserPath) ?? "codex-relay"}
             />
           </View>
@@ -1368,7 +1377,7 @@ const WorkspaceBrowserListRow = memo(function WorkspaceBrowserListRow({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={isParent ? "Open parent folder" : `Open folder ${item.name}`}
+      accessibilityLabel={isParent ? t("Open parent folder") : t("Open folder {0}", item.name)}
       onPress={() => void onOpenDirectory(item.path)}
       style={styles.workspaceFolderButton}
     >
@@ -1395,7 +1404,7 @@ const WorkspaceBrowserListRow = memo(function WorkspaceBrowserListRow({
           </View>
           <View style={styles.workspaceFolderCopy}>
             <Text style={styles.workspaceFolderTitle} numberOfLines={1}>
-              {isParent ? "Parent Folder" : item.name}
+              {isParent ? t("Parent Folder") : item.name}
             </Text>
             {isParent ? (
               <Text style={styles.workspaceFolderSubtitle} numberOfLines={1}>
@@ -1444,18 +1453,18 @@ function RelayVersionNotice({
           <Icon name="warning" size={16} tintColor="#F8C46D" />
         </View>
         <View style={styles.versionNoticeCopy}>
-          <Text style={styles.versionNoticeTitle}>Update relay</Text>
+          <Text style={styles.versionNoticeTitle}>{t("Update relay")}</Text>
           <Text style={styles.versionNoticeBody}>{compatibility.reason}</Text>
         </View>
       </View>
       <View style={styles.versionNoticeRows}>
         {compatibility.serverPackageVersion ? (
-          <VersionNoticeRow label="Current relay" value={compatibility.serverPackageVersion} />
+          <VersionNoticeRow label={t("Current relay")} value={compatibility.serverPackageVersion} />
         ) : null}
         {!compatibility.serverPackageVersion ? (
-          <VersionNoticeRow label="Current relay" value={compatibility.current} />
+          <VersionNoticeRow label={t("Current relay")} value={compatibility.current} />
         ) : null}
-        <VersionNoticeRow label="Required relay" value={compatibility.required} />
+        <VersionNoticeRow label={t("Required relay")} value={compatibility.required} />
       </View>
       <Text style={[styles.versionNoticeCommand, { color: theme.text }]}>
         {compatibility.updateCommand}
@@ -1574,18 +1583,18 @@ function formatRelativeTime(value: string) {
   const day = 24 * hour;
 
   if (diffMs < minute) {
-    return "now";
+    return "刚刚";
   }
   if (diffMs < hour) {
-    return `${Math.floor(diffMs / minute)}m`;
+    return `${Math.floor(diffMs / minute)} 分钟前`;
   }
   if (diffMs < day) {
-    return `${Math.floor(diffMs / hour)}h`;
+    return `${Math.floor(diffMs / hour)} 小时前`;
   }
-  return `${Math.floor(diffMs / day)}d`;
+  return `${Math.floor(diffMs / day)} 天前`;
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   drawerRoot: {
     flex: 1,
     position: "relative",
@@ -1614,8 +1623,8 @@ const styles = StyleSheet.create({
   },
   searchShell: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.055)",
-    borderColor: "rgba(255, 255, 255, 0.08)",
+    backgroundColor: theme.subtle,
+    borderColor: theme.border,
     borderRadius: 8,
     borderWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
@@ -1673,7 +1682,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   versionNoticeBody: {
-    color: "rgba(255, 255, 255, 0.76)",
+    color: theme.textSecondary,
     fontSize: 11,
     lineHeight: 15,
     marginTop: 2,
@@ -1687,7 +1696,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   versionNoticeLabel: {
-    color: "rgba(255, 255, 255, 0.54)",
+    color: theme.textSecondary,
     flexShrink: 0,
     fontSize: 10,
     fontWeight: "600",
@@ -1695,7 +1704,7 @@ const styles = StyleSheet.create({
     width: 78,
   },
   versionNoticeValue: {
-    color: "rgba(255, 255, 255, 0.82)",
+    color: theme.text,
     flex: 1,
     fontSize: 10,
     lineHeight: 14,
@@ -1826,13 +1835,13 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   threadSelected: {
-    backgroundColor: "rgba(255, 255, 255, 0.075)",
+    backgroundColor: theme.subtle,
   },
   drawerPressedContent: {
     opacity: 0.68,
   },
   sidebarResizeGrip: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: theme.subtle,
     borderRadius: 1,
     height: 44,
     opacity: 0.72,
@@ -1891,8 +1900,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
   },
   footerBlock: {
-    backgroundColor: "#191919",
-    borderTopColor: "rgba(255, 255, 255, 0.08)",
+    backgroundColor: theme.background,
+    borderTopColor: theme.border,
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 12,
     paddingTop: 8,
@@ -1923,11 +1932,11 @@ const styles = StyleSheet.create({
     opacity: 0.42,
   },
   workspaceDrawer: {
-    backgroundColor: "#191919",
+    backgroundColor: theme.background,
     flex: 1,
   },
   workspaceDrawerFooter: {
-    borderTopColor: "rgba(255, 255, 255, 0.08)",
+    borderTopColor: theme.border,
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingTop: 10,
   },
@@ -1958,8 +1967,8 @@ const styles = StyleSheet.create({
   },
   workspaceCloseButton: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-    borderColor: "rgba(255, 255, 255, 0.12)",
+    backgroundColor: theme.subtle,
+    borderColor: theme.border,
     borderRadius: 8,
     borderWidth: StyleSheet.hairlineWidth,
     height: 36,
@@ -2066,4 +2075,4 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 32,
   },
-});
+}));

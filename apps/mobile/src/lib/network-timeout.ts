@@ -1,8 +1,9 @@
+import { t } from "../i18n";
 export const defaultNetworkRequestTimeoutMs = 15_000;
 
 export function withTimeout<T>(promise: Promise<T>, timeoutMs: number) {
   return new Promise<T>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("Request timed out.")), timeoutMs);
+    const timeout = setTimeout(() => reject(new Error(t("Request timed out."))), timeoutMs);
     promise.then(resolve, reject).finally(() => clearTimeout(timeout));
   });
 }

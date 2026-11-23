@@ -1,16 +1,19 @@
+import { useTheme } from "@/hooks/use-theme";
+import { t } from "../../i18n";
 import { Drawer } from "expo-router/drawer";
 import { Pressable, useWindowDimensions, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
 
 import { ThreadDrawerContent } from "@/components/chat/ThreadDrawerContent";
+import { appName } from "@/constants/brand";
 import {
   EXPANDED_DRAWER_BREAKPOINT,
   IpadSplitLayoutProvider,
   useIpadSplitLayout,
 } from "@/components/chat/ipad-split-layout";
 import { Icon, type AppIconName } from "@/components/ui/icon";
-import { Colors } from "@/constants/theme";
+
 import { hapticMediumImpact } from "@/lib/haptics";
 
 const COMPACT_DRAWER_WIDTH = 320;
@@ -25,6 +28,7 @@ export default function DrawerLayout() {
 }
 
 function DrawerLayoutContent() {
+  const theme = useTheme();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { beginSidebarResize, isSidebarVisible, resizeSidebar, setSidebarVisible, sidebarWidth } =
@@ -58,11 +62,11 @@ function DrawerLayoutContent() {
         headerShown: false,
         swipeEnabled: false,
         sceneStyle: {
-          backgroundColor: "#191919",
+          backgroundColor: theme.background,
         },
         drawerStyle: {
-          backgroundColor: "#202222",
-          borderRightColor: "rgba(255, 255, 255, 0.08)",
+          backgroundColor: theme.sidebar,
+          borderRightColor: theme.border,
           borderRightWidth: usesExpandedDrawer ? 1 : 0,
           overflow: showsExpandedDrawer ? "visible" : "hidden",
           width: usesExpandedDrawer
@@ -77,8 +81,8 @@ function DrawerLayoutContent() {
       <Drawer.Screen
         name="index"
         options={{
-          drawerLabel: "Threads",
-          title: "Codex Relay",
+          drawerLabel: t("Threads"),
+          title: appName,
         }}
       />
       {__DEV__ ? (
@@ -86,7 +90,7 @@ function DrawerLayoutContent() {
           name="preview"
           options={{
             drawerItemStyle: { display: "none" },
-            title: "Chat Preview",
+            title: t("Chat Preview"),
           }}
         />
       ) : null}
@@ -98,11 +102,11 @@ function CollapsedThreadSidebarRail({ onExpand }: { onExpand: () => void }) {
   return (
     <SafeAreaView edges={["top", "left", "bottom"]} style={styles.collapsedRail}>
       <View style={styles.collapsedRailTop}>
-        <CollapsedRailButton icon="sidebarShow" label="Show threads" onPress={onExpand} />
-        <CollapsedRailButton icon="search" label="Open thread search" onPress={onExpand} />
-        <CollapsedRailButton icon="newChat" label="Open new chat" onPress={onExpand} />
+        <CollapsedRailButton icon="sidebarShow" label={t("Show threads")} onPress={onExpand} />
+        <CollapsedRailButton icon="search" label={t("Open thread search")} onPress={onExpand} />
+        <CollapsedRailButton icon="newChat" label={t("Open new chat")} onPress={onExpand} />
       </View>
-      <CollapsedRailButton icon="settings" label="Open settings" onPress={onExpand} />
+      <CollapsedRailButton icon="settings" label={t("Open settings")} onPress={onExpand} />
     </SafeAreaView>
   );
 }
@@ -116,6 +120,7 @@ function CollapsedRailButton({
   label: string;
   onPress: () => void;
 }) {
+  const theme = useTheme();
   return (
     <Pressable
       accessibilityLabel={label}
@@ -124,15 +129,15 @@ function CollapsedRailButton({
       onPress={onPress}
       style={({ pressed }) => [styles.collapsedRailButton, pressed && styles.pressed]}
     >
-      <Icon name={icon} size={17} tintColor={Colors.dark.textSecondary} />
+      <Icon name={icon} size={17} tintColor={theme.textSecondary} />
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   collapsedRail: {
     alignItems: "center",
-    backgroundColor: "#202222",
+    backgroundColor: theme.sidebar,
     flex: 1,
     justifyContent: "space-between",
     paddingBottom: 10,
@@ -149,7 +154,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   pressed: {
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    backgroundColor: theme.subtle,
     opacity: 0.72,
   },
-});
+}));

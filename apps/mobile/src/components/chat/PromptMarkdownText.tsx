@@ -8,6 +8,7 @@ import { memo, useMemo } from "react";
 import { EnrichedMarkdownText, type MarkdownStyle } from "react-native-enriched-markdown";
 
 import { Fonts } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
 
 export const PromptMarkdownText = memo(function PromptMarkdownText({
   color,
@@ -26,6 +27,7 @@ export const PromptMarkdownText = memo(function PromptMarkdownText({
   selectable?: boolean;
   skills: PromptSkill[];
 }) {
+  const theme = useTheme();
   const markdown = useMemo(() => promptMarkdownWithSkills(prompt, skills), [prompt, skills]);
   const displayMarkdown = useMemo(
     () => markdownWithDisplaySkillLabels(markdown, skills),
@@ -35,7 +37,7 @@ export const PromptMarkdownText = memo(function PromptMarkdownText({
     () => ({
       ...markdownStyle,
       link: {
-        color: "#7CC7FF",
+        color: theme.link,
         fontFamily: Fonts.sansSemiBold,
         underline: false,
         ...markdownStyle?.link,
@@ -50,7 +52,7 @@ export const PromptMarkdownText = memo(function PromptMarkdownText({
         ...markdownStyle?.paragraph,
       },
     }),
-    [color, fontSize, lineHeight, markdownStyle],
+    [color, fontSize, lineHeight, markdownStyle, theme.link],
   );
 
   if (!displayMarkdown) {

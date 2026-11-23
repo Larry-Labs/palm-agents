@@ -100,7 +100,13 @@ export type AppServerThreadItem =
       clientId?: string | null;
       content: AppServerUserInput[];
     }
-  | { type: "agentMessage"; delivery?: "async" | null; id: string; text: string }
+  | {
+      type: "agentMessage";
+      delivery?: "async" | null;
+      id: string;
+      phase?: "commentary" | "final_answer" | null;
+      text: string;
+    }
   | {
       type: "plan";
       id: string;
@@ -131,6 +137,13 @@ export type AppServerThreadItem =
       patch?: string | null;
     }
   | { type: "mcpToolCall"; id: string; server: string; tool: string; status?: string | null }
+  | {
+      type: "dynamicToolCall";
+      id: string;
+      tool: string;
+      status?: string | null;
+      success?: boolean | null;
+    }
   | {
       type: "collabAgentToolCall";
       id: string;

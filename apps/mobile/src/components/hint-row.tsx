@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import React, { type ReactNode } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -12,7 +13,7 @@ type HintRowProps = {
   hint?: ReactNode;
 };
 
-export function HintRow({ title = "Try editing", hint = "app/index.tsx" }: HintRowProps) {
+export function HintRow({ title = t("Try editing"), hint = "app/index.tsx" }: HintRowProps) {
   return (
     <View style={styles.stepRow}>
       <ThemedText type="small">{title}</ThemedText>

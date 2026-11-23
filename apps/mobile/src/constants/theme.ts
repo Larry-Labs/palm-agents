@@ -1,19 +1,23 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, Uniwind, Tamagui, Unistyles, etc.
- */
-
 import { Platform } from "react-native";
 
 export const Colors = {
   light: {
-    text: "#F2F2F2",
-    background: "#191919",
-    backgroundElement: "#2A2A2A",
-    backgroundSelected: "#383838",
-    textSecondary: "#9A9A9A",
-    textSecondaryStrong: "#A6A6A6",
-    powerTrack: "#454545",
+    isDark: false,
+    text: "#202123",
+    background: "#FFFFFF",
+    backgroundElement: "#F5F5F5",
+    backgroundSelected: "#E8E9EB",
+    textSecondary: "#6B6D73",
+    textSecondaryStrong: "#50535A",
+    border: "#DEDFE2",
+    sidebar: "#F7F7F8",
+    surface: "#FFFFFF",
+    primary: "#202123",
+    onPrimary: "#FFFFFF",
+    link: "#0969DA",
+    subtle: "rgba(0, 0, 0, 0.04)",
+    overlay: "rgba(0, 0, 0, 0.28)",
+    powerTrack: "#D7D9DD",
     powerBlue: "#3E96FF",
     powerViolet: "#7868FF",
     powerMagenta: "#C06DFF",
@@ -23,12 +27,21 @@ export const Colors = {
     agentTeal: "#4FB4AE",
   },
   dark: {
+    isDark: true,
     text: "#F2F2F2",
     background: "#191919",
     backgroundElement: "#2A2A2A",
     backgroundSelected: "#383838",
     textSecondary: "#9A9A9A",
     textSecondaryStrong: "#A6A6A6",
+    border: "#3A3A3A",
+    sidebar: "#171717",
+    surface: "#232323",
+    primary: "#F2F2F2",
+    onPrimary: "#191919",
+    link: "#7CC7FF",
+    subtle: "rgba(255, 255, 255, 0.06)",
+    overlay: "rgba(0, 0, 0, 0.42)",
     powerTrack: "#454545",
     powerBlue: "#3E96FF",
     powerViolet: "#7868FF",
@@ -38,9 +51,10 @@ export const Colors = {
     agentCyan: "#48B9D9",
     agentTeal: "#4FB4AE",
   },
-} as const;
+};
 
-export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
+export type AppTheme = typeof Colors.light;
+export type ThemeColor = Exclude<keyof AppTheme, "isDark">;
 
 export const Fonts = Platform.select({
   default: {

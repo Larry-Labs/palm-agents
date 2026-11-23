@@ -1,3 +1,4 @@
+import { t } from "../../../i18n";
 import * as Clipboard from "expo-clipboard";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -243,7 +244,7 @@ export function WorkspaceSshTerminalTab({
     setReconnectRequestId(nextReconnectRequestId);
     setTerminalError(null);
     setTerminalSessionStatus("reconnecting");
-    setTerminalSessionMessage("Reconnecting to the existing terminal session");
+    setTerminalSessionMessage(t("Reconnecting to the existing terminal session"));
     postWorkspaceSshTerminalState({
       fontSize: terminalFontSize,
       reconnectRequestId: nextReconnectRequestId,
@@ -450,7 +451,7 @@ export function WorkspaceSshTerminalTab({
             <View style={styles.terminalOverlay}>
               <ActivityIndicator color="#8EA2BD" size="small" />
               <ThemedText type="small" style={styles.terminalOverlayText}>
-                Loading terminal
+                {t("Loading terminal")}
               </ThemedText>
             </View>
           ) : null}
@@ -463,13 +464,13 @@ export function WorkspaceSshTerminalTab({
                 </ThemedText>
               </View>
               <Pressable
-                accessibilityLabel="Reconnect terminal session"
+                accessibilityLabel={t("Reconnect terminal session")}
                 accessibilityRole="button"
                 onPress={requestTerminalReconnect}
                 style={styles.terminalErrorButton}
               >
                 <ThemedText type="small" style={styles.terminalErrorButtonText}>
-                  Reconnect
+                  {t("Reconnect")}
                 </ThemedText>
               </Pressable>
             </View>
@@ -484,10 +485,10 @@ export function WorkspaceSshTerminalTab({
             )}
             <ThemedText type="small" style={styles.terminalStatusText}>
               {terminalSessionStatus === "closed"
-                ? "Terminal session closed"
+                ? t("Terminal session closed")
                 : terminalSessionStatus === "reconnecting"
-                  ? "Reconnecting terminal"
-                  : "Connecting terminal"}
+                  ? t("Reconnecting terminal")
+                  : t("Connecting terminal")}
             </ThemedText>
             {terminalSessionMessage ? (
               <ThemedText type="small" style={styles.terminalStatusDetail} numberOfLines={1}>
@@ -499,12 +500,12 @@ export function WorkspaceSshTerminalTab({
         <View style={styles.terminalShortcutBar}>
           <View style={styles.terminalShortcutRow}>
             <TerminalShortcutButton
-              accessibilityLabel="Show keyboard"
+              accessibilityLabel={t("Show keyboard")}
               label="⌨"
               onPress={focusTerminalKeyboard}
             />
             <TerminalShortcutButton
-              accessibilityLabel="Reconnect terminal session"
+              accessibilityLabel={t("Reconnect terminal session")}
               active={terminalSessionStatus === "reconnecting"}
               label="↻"
               onPress={requestTerminalReconnect}
@@ -520,7 +521,7 @@ export function WorkspaceSshTerminalTab({
               onPress={() => void sendTerminalInput("\t")}
             />
             <TerminalShortcutButton
-              accessibilityLabel="Control modifier"
+              accessibilityLabel={t("Control modifier")}
               active={isCtrlActive}
               label="Ctrl"
               onPress={() => {
@@ -529,12 +530,12 @@ export function WorkspaceSshTerminalTab({
               }}
             />
             <TerminalShortcutButton
-              accessibilityLabel="Paste"
-              label="Paste"
+              accessibilityLabel={t("Paste")}
+              label={t("Paste")}
               onPress={() => void handlePaste()}
             />
             <TerminalShortcutButton
-              accessibilityLabel="More terminal shortcuts"
+              accessibilityLabel={t("More terminal shortcuts")}
               active={isShortcutsExpanded}
               label="⋯"
               onPress={() => setIsShortcutsExpanded((value) => !value)}
@@ -544,22 +545,22 @@ export function WorkspaceSshTerminalTab({
             <View style={styles.terminalExpandedShortcutRows}>
               <View style={styles.terminalShortcutRow}>
                 <TerminalShortcutButton
-                  accessibilityLabel="Left arrow"
+                  accessibilityLabel={t("Left arrow")}
                   label="←"
                   onPress={() => void sendTerminalInput(terminalArrowSequences.left)}
                 />
                 <TerminalShortcutButton
-                  accessibilityLabel="Up arrow"
+                  accessibilityLabel={t("Up arrow")}
                   label="↑"
                   onPress={() => void sendTerminalInput(terminalArrowSequences.up)}
                 />
                 <TerminalShortcutButton
-                  accessibilityLabel="Down arrow"
+                  accessibilityLabel={t("Down arrow")}
                   label="↓"
                   onPress={() => void sendTerminalInput(terminalArrowSequences.down)}
                 />
                 <TerminalShortcutButton
-                  accessibilityLabel="Right arrow"
+                  accessibilityLabel={t("Right arrow")}
                   label="→"
                   onPress={() => void sendTerminalInput(terminalArrowSequences.right)}
                 />
@@ -578,7 +579,7 @@ export function WorkspaceSshTerminalTab({
                   onPress={() => void sendTerminalInput("\x1a")}
                 />
                 <TerminalShortcutButton
-                  label="Clear"
+                  label={t("Clear")}
                   onPress={() => void sendTerminalInput("clear\r")}
                 />
               </View>
@@ -598,7 +599,7 @@ export function WorkspaceSshTerminalTab({
                   onPress={() => setFontSize(terminalFontSize + 1)}
                 />
                 <TerminalShortcutButton
-                  label="Reset"
+                  label={t("Reset")}
                   onPress={() => void sendTerminalInput("reset\r")}
                 />
               </View>
@@ -711,14 +712,14 @@ function controlCharacter(char: string) {
   }
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   keyboardAwareContent: {
     flex: 1,
     minHeight: 0,
   },
   terminalFrame: {
     backgroundColor: "#1F1F1F",
-    borderColor: "rgba(255, 255, 255, 0.12)",
+    borderColor: theme.border,
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -818,8 +819,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   terminalShortcutBar: {
-    backgroundColor: "#232323",
-    borderTopColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: theme.surface,
+    borderTopColor: theme.border,
     borderTopWidth: 1,
     gap: 7,
     paddingHorizontal: 10,
@@ -835,7 +836,7 @@ const styles = StyleSheet.create({
   terminalShortcutButton: {
     alignItems: "center",
     backgroundColor: "#2B2B2B",
-    borderColor: "rgba(255, 255, 255, 0.12)",
+    borderColor: theme.border,
     borderRadius: 6,
     borderWidth: 1,
     flex: 1,
@@ -855,4 +856,4 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     textAlign: "center",
   },
-});
+}));

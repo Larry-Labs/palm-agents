@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
 
 import { Text } from "@/components/ui/text";
-import { Colors, Fonts, Spacing } from "@/constants/theme";
+import { Fonts, Spacing } from "@/constants/theme";
 
 type AppToastAction = {
   accessibilityLabel: string;
@@ -178,7 +178,7 @@ export function AppToast({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   toastHost: {
     left: Spacing.four,
     position: "absolute",
@@ -187,8 +187,8 @@ const styles = StyleSheet.create({
   toast: {
     alignItems: "center",
     alignSelf: "center",
-    backgroundColor: "rgba(31, 34, 34, 0.96)",
-    borderColor: "rgba(255, 255, 255, 0.14)",
+    backgroundColor: theme.backgroundElement,
+    borderColor: theme.border,
     borderRadius: 18,
     borderWidth: 1,
     flexDirection: "row",
@@ -205,8 +205,8 @@ const styles = StyleSheet.create({
   },
   iconShell: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.07)",
-    borderColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: theme.subtle,
+    borderColor: theme.border,
     borderRadius: 999,
     borderWidth: 1,
     height: 28,
@@ -219,20 +219,20 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   title: {
-    color: Colors.dark.text,
+    color: theme.text,
     fontFamily: Fonts.sansSemiBold,
     fontSize: 14,
     lineHeight: 18,
   },
   message: {
-    color: Colors.dark.textSecondary,
+    color: theme.textSecondary,
     fontFamily: Fonts.sans,
     fontSize: 12,
     lineHeight: 16,
   },
   action: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    backgroundColor: theme.subtle,
     borderRadius: 999,
     justifyContent: "center",
     minHeight: 32,
@@ -246,9 +246,9 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   actionText: {
-    color: Colors.dark.text,
+    color: theme.text,
     fontFamily: Fonts.sansSemiBold,
     fontSize: 12,
     lineHeight: 16,
   },
-});
+}));

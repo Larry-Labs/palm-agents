@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import {
   StreamThreadRunEventSchema,
   type QueuedThreadInput,
@@ -95,7 +96,7 @@ export function parseThreadRunStreamPayload(
     }
   } catch {}
 
-  throw new Error("Codex Relay server returned an invalid stream event.");
+  throw new Error(t("Codex Relay server returned an invalid stream event."));
 }
 
 export function dispatchThreadRunSseChunk(

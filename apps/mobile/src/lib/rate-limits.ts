@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import {
   rateLimitRemainingPercent,
   type RateLimitBucket,
@@ -62,7 +63,7 @@ export function visibleRateLimitRows(buckets: RateLimitBucket[]) {
 }
 
 export function formatRateLimitRemaining(window: RateLimitWindow & { remainingPercent: number }) {
-  const reset = window.resetsAt ? ` until ${formatReset(window.resetsAt)}` : "";
+  const reset = window.resetsAt ? t(" until {0}", formatReset(window.resetsAt)) : "";
   return `${window.remainingPercent}%${reset}`;
 }
 
@@ -72,15 +73,15 @@ function durationLabel(window: RateLimitWindow) {
     return undefined;
   }
   if (minutes % 10080 === 0) {
-    return minutes === 10080 ? "Weekly" : `${minutes / 10080}w`;
+    return minutes === 10080 ? t("Weekly") : `${minutes / 10080} 周`;
   }
   if (minutes % 1440 === 0) {
-    return minutes === 1440 ? "Daily" : `${minutes / 1440}d`;
+    return minutes === 1440 ? t("Daily") : `${minutes / 1440} 天`;
   }
   if (minutes % 60 === 0) {
-    return `${minutes / 60}h`;
+    return `${minutes / 60} 小时`;
   }
-  return `${minutes}m`;
+  return `${minutes} 分钟`;
 }
 
 function formatReset(epochSeconds: number) {

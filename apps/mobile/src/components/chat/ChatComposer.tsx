@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { LegendList, type LegendListRenderItemProps } from "@legendapp/list/react-native";
 import { useSelector } from "@legendapp/state/react";
 import { useQuery } from "@tanstack/react-query";
@@ -16,6 +17,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useMemo,
   useReducer,
   useRef,
@@ -24,6 +26,7 @@ import {
   type Ref,
 } from "react";
 import {
+  Keyboard,
   Pressable,
   TextInput,
   View,
@@ -78,8 +81,8 @@ const ATTACH_SHEET_DISMISS_DELAY_MS = 260;
 const ADD_SHEET_KEYBOARD_DISMISS_FALLBACK_MS = 360;
 const FILE_MENTION_INDICATOR = "@";
 const SKILL_MENTION_INDICATOR = "$";
-const DEFAULT_COMPOSER_PLACEHOLDER = "Ask Codex anything. Try $skills or @files.";
-const PLAN_COMPOSER_PLACEHOLDER = "Ask Codex for a plan. Try $skills or @files.";
+const DEFAULT_COMPOSER_PLACEHOLDER = t("Ask Codex anything. Try $skills or @files.");
+const PLAN_COMPOSER_PLACEHOLDER = t("Ask Codex for a plan. Try $skills or @files.");
 const SUGGESTION_ROW_ESTIMATED_SIZE = 44;
 const SUGGESTION_LIST_GAP = 2;
 const SUGGESTION_LIST_MAX_HEIGHT = 270;
@@ -228,6 +231,10 @@ function initialInputRequestDraft(requestId: string | undefined) {
   };
 }
 
+export type ChatComposerHandle = {
+  dismissKeyboard: () => void;
+};
+
 export const ChatComposer = memo(function ChatComposer({
   contextWindowUsage,
   disabled,
@@ -263,6 +270,7 @@ export const ChatComposer = memo(function ChatComposer({
   onSaveGoal,
   onToggleGoalPause,
   rateLimitBuckets,
+  ref,
   skills,
   skillsLoadState,
   workspacePath,
@@ -301,6 +309,7 @@ export const ChatComposer = memo(function ChatComposer({
   onSaveGoal?: (objective: string) => void;
   onToggleGoalPause?: () => void;
   rateLimitBuckets: RateLimitBucket[];
+  ref?: Ref<ChatComposerHandle>;
   skills: AgentSkill[];
   skillsLoadState: "idle" | "loading" | "loaded" | "failed";
   workspacePath?: string;
@@ -336,6 +345,7 @@ export const ChatComposer = memo(function ChatComposer({
   const isInputRequestFreeformSelected = inputRequestDraft.freeformSelected;
   const selectedInputOption = inputRequestDraft.selectedOption;
   const inputRef = useRef<EnrichedMarkdownTextInputInstance | null>(null);
+  const keyboardDismissedRef = useRef(false);
   const isInputFocusedRef = useRef(false);
   const lastInputFocusAtRef = useRef(0);
   const previousFocusRecoveryKeyRef = useRef(focusRecoveryKey);
@@ -357,7 +367,7 @@ export const ChatComposer = memo(function ChatComposer({
   const canSend = hasMessageContent && !disabled && !isAttachBusy;
   const canStop = isRunning && !hasMessageContent;
   const showSendButton = !isRunning || hasMessageContent;
-  const actionLabel = isRunning ? "Send running input" : "Send";
+  const actionLabel = isRunning ? t("Send running input") : t("Send");
   const rateLimitRows = visibleRateLimitRows(rateLimitBuckets);
   const isPlanMode = collaborationMode === "plan";
   const shouldShowSkillSuggestions = Boolean(
@@ -389,7 +399,13 @@ export const ChatComposer = memo(function ChatComposer({
     }),
     [isPlanMode, theme.text],
   );
-  const inputMarkdownStyle = MENTION_INPUT_MARKDOWN_STYLE;
+  const inputMarkdownStyle = useMemo(
+    () => ({
+      ...MENTION_INPUT_MARKDOWN_STYLE,
+      link: { ...MENTION_INPUT_MARKDOWN_STYLE.link, color: theme.link },
+    }),
+    [theme.link],
+  );
   const shouldShowPlanConfirmation = Boolean(
     planConfirmationId &&
     planConfirmationId !== dismissedPlanConfirmationId &&
@@ -427,7 +443,7 @@ export const ChatComposer = memo(function ChatComposer({
       return;
     }
     previousFocusRecoveryKeyRef.current = focusRecoveryKey;
-    if (focusRecoveryKey === undefined || !isInputEditable) {
+    if (focusRecoveryKey === undefined || !isInputEditable || keyboardDismissedRef.current) {
       return;
     }
 
@@ -437,7 +453,9 @@ export const ChatComposer = memo(function ChatComposer({
     }
 
     requestAnimationFrame(() => {
-      inputRef.current?.focus();
+      if (!keyboardDismissedRef.current) {
+        inputRef.current?.focus();
+      }
     });
     if (focusRecoveryTimeoutRef.current) {
       clearTimeout(focusRecoveryTimeoutRef.current);
@@ -447,6 +465,26 @@ export const ChatComposer = memo(function ChatComposer({
       inputRef.current?.focus();
     }, 220);
   }, [focusRecoveryKey, isInputEditable, isKeyboardVisible]);
+
+  const blurComposerInput = useCallback(() => {
+    keyboardDismissedRef.current = true;
+    if (focusRecoveryTimeoutRef.current) {
+      clearTimeout(focusRecoveryTimeoutRef.current);
+      focusRecoveryTimeoutRef.current = undefined;
+    }
+    inputRef.current?.blur();
+  }, []);
+
+  const dismissComposerKeyboard = useCallback(() => {
+    blurComposerInput();
+    onKeyboardLayoutFrozenChange?.(false);
+    Keyboard.dismiss();
+    void KeyboardController.dismiss().catch(() => undefined);
+  }, [blurComposerInput, onKeyboardLayoutFrozenChange]);
+
+  useImperativeHandle(ref, () => ({ dismissKeyboard: dismissComposerKeyboard }), [
+    dismissComposerKeyboard,
+  ]);
 
   useEffect(() => {
     const shouldRestoreSkillMentions =
@@ -500,12 +538,6 @@ export const ChatComposer = memo(function ChatComposer({
     onKeyboardLayoutFrozenChange?.(false);
   }
 
-  function dismissComposerKeyboard() {
-    inputRef.current?.blur();
-    onKeyboardLayoutFrozenChange?.(false);
-    void KeyboardController.dismiss().catch(() => undefined);
-  }
-
   function handleSendPress() {
     dismissComposerKeyboard();
     onSend();
@@ -514,7 +546,7 @@ export const ChatComposer = memo(function ChatComposer({
   async function openAddSheet() {
     hapticSelection();
     onKeyboardLayoutFrozenChange?.(true);
-    inputRef.current?.blur();
+    blurComposerInput();
     await dismissKeyboardForSheet();
     setAddSheetOpen(true);
   }
@@ -1006,8 +1038,8 @@ export const ChatComposer = memo(function ChatComposer({
         style={[
           styles.container,
           {
-            backgroundColor: theme.backgroundElement,
-            borderColor: "rgba(255, 255, 255, 0.1)",
+            backgroundColor: theme.surface,
+            borderColor: theme.border,
           },
         ]}
       >
@@ -1024,13 +1056,14 @@ export const ChatComposer = memo(function ChatComposer({
           onChangeSelection={handleInputSelectionChange}
           onChangeText={handleInputTextChange}
           onFocus={() => {
+            keyboardDismissedRef.current = false;
             isInputFocusedRef.current = true;
             lastInputFocusAtRef.current = Date.now();
           }}
           ref={inputRef}
           placeholder={
             !isInputEditable
-              ? (disabledPlaceholder ?? "Connect to the Codex Relay server first")
+              ? (disabledPlaceholder ?? t("Connect to the Codex Relay server first"))
               : isPlanMode
                 ? PLAN_COMPOSER_PLACEHOLDER
                 : DEFAULT_COMPOSER_PLACEHOLDER
@@ -1042,15 +1075,15 @@ export const ChatComposer = memo(function ChatComposer({
         />
         {isPlanMode ? (
           <Pressable
-            accessibilityLabel="Plan mode is on"
+            accessibilityLabel={t("Plan mode is on")}
             accessibilityRole="button"
-            accessibilityHint="Turns off Plan mode"
+            accessibilityHint={t("Turns off Plan mode")}
             hitSlop={6}
             onPress={togglePlanMode}
             style={({ pressed }) => [styles.planModeChip, pressed && styles.pressed]}
           >
             <Text numberOfLines={1} style={styles.planModeChipText}>
-              Plan mode
+              {t("Plan mode")}
             </Text>
           </Pressable>
         ) : null}
@@ -1063,7 +1096,7 @@ export const ChatComposer = memo(function ChatComposer({
         <View style={styles.actionRow}>
           <View style={styles.leadingActions}>
             <Button
-              accessibilityLabel="Open add menu"
+              accessibilityLabel={t("Open add menu")}
               onPress={openAddSheet}
               disabled={disabled || isAttachBusy}
               size="icon"
@@ -1096,7 +1129,7 @@ export const ChatComposer = memo(function ChatComposer({
 
           {canStop ? (
             <Button
-              accessibilityLabel="Stop"
+              accessibilityLabel={t("Stop")}
               onPress={onCancel}
               disabled={disabled}
               size="icon"
@@ -1109,26 +1142,28 @@ export const ChatComposer = memo(function ChatComposer({
           ) : null}
         </View>
       </Animated.View>
-      <AppBottomSheet title="Add context" onClose={closeAddSheet} visible={isAddSheetOpen}>
+      <AppBottomSheet title={t("Add context")} onClose={closeAddSheet} visible={isAddSheetOpen}>
         <SheetActionRow
-          accessibilityLabel="Add photos from library"
+          accessibilityLabel={t("Add photos from library")}
           icon="attach"
-          title="Photos"
-          subtitle={isAttachBusy ? "Opening photo library" : "Choose images from your library"}
+          title={t("Photos")}
+          subtitle={
+            isAttachBusy ? t("Opening photo library") : t("Choose images from your library")
+          }
           disabled={isAttachBusy}
           onPress={attachFromSheet}
         />
         <SheetActionRow
-          accessibilityLabel={isPlanMode ? "Turn off Plan mode" : "Turn on Plan mode"}
+          accessibilityLabel={isPlanMode ? t("Turn off Plan mode") : t("Turn on Plan mode")}
           icon="controls"
-          title="Plan mode"
-          subtitle={isPlanMode ? "Plan first, then wait" : "Ask Codex to plan before editing"}
+          title={t("Plan mode")}
+          subtitle={isPlanMode ? t("Plan first, then wait") : t("Ask Codex to plan before editing")}
           selected={isPlanMode}
           onPress={togglePlanMode}
         />
         <View style={styles.sheetSection}>
           <Text style={[styles.sheetSectionTitle, { color: theme.textSecondary }]}>
-            Usage limits
+            {t("Usage limits")}
           </Text>
           {rateLimitRows.length > 0 ? (
             rateLimitRows.map((row) => (
@@ -1141,7 +1176,7 @@ export const ChatComposer = memo(function ChatComposer({
                     numberOfLines={1}
                     style={[styles.limitSubtitle, { color: theme.textSecondary }]}
                   >
-                    {formatRateLimitRemaining(row.window)} left
+                    {formatRateLimitRemaining(row.window)} {t("left")}
                   </Text>
                 </View>
                 <Text style={[styles.limitValue, { color: theme.text }]}>
@@ -1152,9 +1187,9 @@ export const ChatComposer = memo(function ChatComposer({
           ) : (
             <View style={styles.limitRow}>
               <View style={styles.limitCopy}>
-                <Text style={[styles.limitTitle, { color: theme.text }]}>Rate limits</Text>
+                <Text style={[styles.limitTitle, { color: theme.text }]}>{t("Rate limits")}</Text>
                 <Text style={[styles.limitSubtitle, { color: theme.textSecondary }]}>
-                  Unavailable from this runtime
+                  {t("Unavailable from this runtime")}
                 </Text>
               </View>
             </View>
@@ -1194,6 +1229,7 @@ const SkillSuggestionPanel = memo(function SkillSuggestionPanel({
   textColor: string;
   textSecondaryColor: string;
 }) {
+  const theme = useTheme();
   const renderSkill = useCallback(
     ({ item }: LegendListRenderItemProps<AgentSkill>) => (
       <SkillSuggestionRow
@@ -1214,7 +1250,7 @@ const SkillSuggestionPanel = memo(function SkillSuggestionPanel({
         styles.skillPanel,
         {
           backgroundColor: "rgba(28, 28, 30, 0.98)",
-          borderColor: "rgba(255, 255, 255, 0.14)",
+          borderColor: theme.border,
         },
       ]}
     >
@@ -1240,7 +1276,7 @@ const SkillSuggestionPanel = memo(function SkillSuggestionPanel({
             tintColor={textSecondaryColor}
           />
           <Text style={[styles.skillEmptyText, { color: textSecondaryColor }]}>
-            {loadState === "failed" ? "Skills unavailable" : "No matching skills"}
+            {loadState === "failed" ? t("Skills unavailable") : t("No matching skills")}
           </Text>
         </View>
       )}
@@ -1262,7 +1298,7 @@ const SkillSuggestionRow = memo(function SkillSuggestionRow({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Insert ${skill.displayName} skill`}
+      accessibilityLabel={t("Insert {0} skill", skill.displayName)}
       onPress={() => onSelectSkill(skill)}
       style={({ pressed }) => [styles.skillRow, pressed && styles.skillRowPressed]}
     >
@@ -1301,6 +1337,7 @@ const FileSuggestionPanel = memo(function FileSuggestionPanel({
   textColor: string;
   textSecondaryColor: string;
 }) {
+  const theme = useTheme();
   const renderFile = useCallback(
     ({ item }: LegendListRenderItemProps<WorkspaceFileMention>) => (
       <FileSuggestionRow
@@ -1321,7 +1358,7 @@ const FileSuggestionPanel = memo(function FileSuggestionPanel({
         styles.skillPanel,
         {
           backgroundColor: "rgba(28, 28, 30, 0.98)",
-          borderColor: "rgba(255, 255, 255, 0.14)",
+          borderColor: theme.border,
         },
       ]}
     >
@@ -1343,7 +1380,7 @@ const FileSuggestionPanel = memo(function FileSuggestionPanel({
         <View style={styles.skillEmptyRow}>
           <Icon name={isLoading ? "running" : "search"} size={14} tintColor={textSecondaryColor} />
           <Text style={[styles.skillEmptyText, { color: textSecondaryColor }]}>
-            {isLoading ? "Searching files" : "No matching files"}
+            {isLoading ? t("Searching files") : t("No matching files")}
           </Text>
         </View>
       )}
@@ -1365,7 +1402,7 @@ const FileSuggestionRow = memo(function FileSuggestionRow({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Insert ${file.path}`}
+      accessibilityLabel={t("Insert {0}", file.path)}
       onPress={() => onSelectFile(file)}
       style={({ pressed }) => [styles.skillRow, pressed && styles.skillRowPressed]}
     >
@@ -1433,6 +1470,7 @@ const ComposerTopAccessoryPanel = memo(function ComposerTopAccessoryPanel({
   textColor: string;
   textSecondaryColor: string;
 }) {
+  const theme = useTheme();
   const [isEditingGoal, setEditingGoal] = useState(false);
   const [goalDraft, setGoalDraft] = useState(goal?.objective ?? "");
   const trimmedGoalDraft = goalDraft.trim();
@@ -1489,7 +1527,7 @@ const ComposerTopAccessoryPanel = memo(function ComposerTopAccessoryPanel({
           styles.queuePanel,
           {
             backgroundColor: "rgba(28, 28, 30, 0.98)",
-            borderColor: "rgba(255, 255, 255, 0.14)",
+            borderColor: theme.border,
           },
         ]}
       >
@@ -1517,7 +1555,7 @@ const ComposerTopAccessoryPanel = memo(function ComposerTopAccessoryPanel({
               <View style={styles.queueActions}>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Steer queued prompt ${index + 1}`}
+                  accessibilityLabel={t("Steer queued prompt {0}", index + 1)}
                   hitSlop={6}
                   onPress={() => {
                     hapticMediumImpact();
@@ -1532,14 +1570,14 @@ const ComposerTopAccessoryPanel = memo(function ComposerTopAccessoryPanel({
                         numberOfLines={1}
                         style={[styles.queueActionText, { color: textColor }]}
                       >
-                        Steering
+                        {t("Steering")}
                       </Text>
                     </View>
                   )}
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Restore queued prompt ${index + 1} to composer`}
+                  accessibilityLabel={t("Restore queued prompt {0} to composer", index + 1)}
                   hitSlop={6}
                   onPress={() => {
                     hapticSelection();
@@ -1557,7 +1595,7 @@ const ComposerTopAccessoryPanel = memo(function ComposerTopAccessoryPanel({
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Remove queued prompt ${index + 1}`}
+                  accessibilityLabel={t("Remove queued prompt {0}", index + 1)}
                   hitSlop={6}
                   onPress={() => {
                     hapticWarning();
@@ -1590,7 +1628,7 @@ const ComposerTopAccessoryPanel = memo(function ComposerTopAccessoryPanel({
               <View style={styles.goalPromptBody}>
                 <View style={styles.goalTitleRow}>
                   <Text numberOfLines={1} style={[styles.goalLabel, { color: textSecondaryColor }]}>
-                    Goal
+                    {t("Goal")}
                   </Text>
                   <Text numberOfLines={1} style={[styles.goalMeta, { color: textSecondaryColor }]}>
                     {goalStatusMeta(goal)}
@@ -1604,7 +1642,7 @@ const ComposerTopAccessoryPanel = memo(function ComposerTopAccessoryPanel({
             <View style={[styles.goalActions, !canToggleGoalPause && styles.goalActionsCompact]}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Edit goal"
+                accessibilityLabel={t("Edit goal")}
                 hitSlop={6}
                 onPress={() => {
                   hapticSelection();
@@ -1622,7 +1660,7 @@ const ComposerTopAccessoryPanel = memo(function ComposerTopAccessoryPanel({
               {canToggleGoalPause ? (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={goal.status === "paused" ? "Resume goal" : "Pause goal"}
+                  accessibilityLabel={goal.status === "paused" ? t("Resume goal") : t("Pause goal")}
                   hitSlop={6}
                   onPress={() => {
                     hapticMediumImpact();
@@ -1645,7 +1683,7 @@ const ComposerTopAccessoryPanel = memo(function ComposerTopAccessoryPanel({
               ) : null}
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Clear goal"
+                accessibilityLabel={t("Clear goal")}
                 hitSlop={6}
                 onPress={() => {
                   hapticWarning();
@@ -1665,7 +1703,7 @@ const ComposerTopAccessoryPanel = memo(function ComposerTopAccessoryPanel({
       </Animated.View>
       <AppBottomSheet
         expandedSnapPercent={52}
-        title="Edit goal"
+        title={t("Edit goal")}
         onClose={closeGoalEditor}
         scrollable={false}
         visible={Boolean(goal && isEditingGoal)}
@@ -1678,14 +1716,14 @@ const ComposerTopAccessoryPanel = memo(function ComposerTopAccessoryPanel({
             multiline
             onChangeText={setGoalDraft}
             onSubmitEditing={saveGoalDraft}
-            placeholder="Goal objective"
+            placeholder={t("Goal objective")}
             placeholderTextColor={textSecondaryColor}
             returnKeyType="done"
             selectionColor="rgba(124, 199, 255, 0.28)"
             style={[
               styles.goalEditSheetInput,
               {
-                borderColor: "rgba(255, 255, 255, 0.14)",
+                borderColor: theme.border,
                 color: textColor,
               },
             ]}
@@ -1695,15 +1733,17 @@ const ComposerTopAccessoryPanel = memo(function ComposerTopAccessoryPanel({
           <View style={styles.goalEditSheetActions}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Cancel goal edit"
+              accessibilityLabel={t("Cancel goal edit")}
               onPress={closeGoalEditor}
               style={({ pressed }) => [styles.planDismissButton, pressed && styles.pressed]}
             >
-              <Text style={[styles.goalEditCancelText, { color: textSecondaryColor }]}>Cancel</Text>
+              <Text style={[styles.goalEditCancelText, { color: textSecondaryColor }]}>
+                {t("Cancel")}
+              </Text>
             </Pressable>
             <Button
               accessibilityRole="button"
-              accessibilityLabel="Save goal"
+              accessibilityLabel={t("Save goal")}
               disabled={!canSaveGoalDraft}
               onPress={saveGoalDraft}
               style={[
@@ -1711,7 +1751,7 @@ const ComposerTopAccessoryPanel = memo(function ComposerTopAccessoryPanel({
                 !canSaveGoalDraft && styles.goalEditSaveButtonDisabled,
               ]}
             >
-              <Text style={styles.planSubmitText}>Save</Text>
+              <Text style={styles.planSubmitText}>{t("Save")}</Text>
             </Button>
           </View>
         </View>
@@ -1790,17 +1830,17 @@ function PlanDecisionPanel({
         styles.planDecisionPanel,
         {
           backgroundColor: theme.backgroundElement,
-          borderColor: "rgba(255, 255, 255, 0.14)",
+          borderColor: theme.border,
         },
       ]}
     >
       <Text style={[styles.planDecisionTitle, { color: theme.text }]}>
-        Do you want to implement this plan?
+        {t("Do you want to implement this plan?")}
       </Text>
       <View style={styles.planDecisionRows}>
         <PlanDecisionRow
           index={1}
-          label="Yes, implement this plan"
+          label={t("Yes, implement this plan")}
           selected={selectedDecision === "implement"}
           textColor={theme.text}
           textSecondaryColor={theme.textSecondary}
@@ -1821,15 +1861,19 @@ function PlanDecisionPanel({
       <View style={styles.planDecisionActions}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Dismiss plan decision"
+          accessibilityLabel={t("Dismiss plan decision")}
           onPress={onDismiss}
           style={({ pressed }) => [styles.planDismissButton, pressed && styles.pressed]}
         >
-          <Text style={[styles.planDismissText, { color: theme.textSecondary }]}>Ignore</Text>
+          <Text style={[styles.planDismissText, { color: theme.textSecondary }]}>
+            {t("Ignore")}
+          </Text>
         </Pressable>
         <Button
           accessibilityLabel={
-            selectedDecision === "implement" ? "Implement plan" : "Add context before implementing"
+            selectedDecision === "implement"
+              ? t("Implement plan")
+              : t("Add context before implementing")
           }
           accessibilityRole="button"
           disabled={!canSubmit}
@@ -1838,7 +1882,7 @@ function PlanDecisionPanel({
           variant="default"
           style={styles.planSubmitButton}
         >
-          <Text style={styles.planSubmitText}>Submit ↩</Text>
+          <Text style={styles.planSubmitText}>{t("Submit ↩")}</Text>
         </Button>
       </View>
     </Animated.View>
@@ -1890,13 +1934,13 @@ function InputRequestPanel({
         styles.planDecisionPanel,
         {
           backgroundColor: theme.backgroundElement,
-          borderColor: "rgba(255, 255, 255, 0.14)",
+          borderColor: theme.border,
         },
       ]}
     >
       <View style={styles.inputRequestTitleRow}>
         <Text style={[styles.planDecisionTitle, { color: theme.text }]}>
-          {question?.header ?? "Codex needs input"}
+          {question?.header ?? t("Codex needs input")}
         </Text>
         {request.questions.length > 1 ? (
           <Text style={[styles.inputRequestCount, { color: theme.textSecondary }]}>
@@ -1944,20 +1988,22 @@ function InputRequestPanel({
         </>
       ) : (
         <Text style={[styles.inputRequestQuestion, { color: theme.textSecondary }]}>
-          Codex requested input, but no question was provided.
+          {t("Codex requested input, but no question was provided.")}
         </Text>
       )}
       <View style={styles.planDecisionActions}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Ignore input request"
+          accessibilityLabel={t("Ignore input request")}
           onPress={onIgnore}
           style={({ pressed }) => [styles.planDismissButton, pressed && styles.pressed]}
         >
-          <Text style={[styles.planDismissText, { color: theme.textSecondary }]}>Ignore</Text>
+          <Text style={[styles.planDismissText, { color: theme.textSecondary }]}>
+            {t("Ignore")}
+          </Text>
         </Pressable>
         <Button
-          accessibilityLabel="Submit input request answer"
+          accessibilityLabel={t("Submit input request answer")}
           accessibilityRole="button"
           disabled={!canSubmit}
           onPress={onSubmit}
@@ -1965,7 +2011,7 @@ function InputRequestPanel({
           variant="default"
           style={styles.planSubmitButton}
         >
-          <Text style={styles.planSubmitText}>Submit ↩</Text>
+          <Text style={styles.planSubmitText}>{t("Submit ↩")}</Text>
         </Button>
       </View>
     </Animated.View>
@@ -2061,7 +2107,7 @@ const PlanContextInputRow = memo(function PlanContextInputRow({
     >
       <Text style={[styles.planDecisionIndex, { color: textSecondaryColor }]}>{index}.</Text>
       <TextInput
-        accessibilityLabel="Additional context for Codex"
+        accessibilityLabel={t("Additional context for Codex")}
         allowFontScaling={false}
         maxFontSizeMultiplier={1}
         ref={ref}
@@ -2075,7 +2121,7 @@ const PlanContextInputRow = memo(function PlanContextInputRow({
           onSelect?.();
           onPress();
         }}
-        placeholder="Give Codex more context"
+        placeholder={t("Give Codex more context")}
         placeholderTextColor={textSecondaryColor}
         multiline
         returnKeyType="default"
@@ -2157,7 +2203,7 @@ const AttachmentRail = memo(function AttachmentRail({
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Remove image ${index + 1}`}
+            accessibilityLabel={t("Remove image {0}", index + 1)}
             hitSlop={8}
             onPress={() => {
               hapticSelection();
@@ -2204,8 +2250,8 @@ function ContextUsageRing({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Context usage"
-      accessibilityValue={{ text: usage ? `${clamped}% used` : "Usage unavailable" }}
+      accessibilityLabel={t("Context usage")}
+      accessibilityValue={{ text: usage ? t("{0}% used", clamped) : t("Usage unavailable") }}
       hitSlop={6}
       onPress={() => {
         hapticSelection();
@@ -2835,15 +2881,15 @@ function goalStatusMeta(goal: ThreadGoal) {
     case "active":
       return formatGoalElapsed(goal.timeUsedSeconds);
     case "paused":
-      return "Paused";
+      return t("Paused");
     case "complete":
-      return `Complete ${formatGoalElapsed(goal.timeUsedSeconds)}`;
+      return t("Complete {0}", formatGoalElapsed(goal.timeUsedSeconds));
     case "blocked":
-      return "Blocked";
+      return t("Blocked");
     case "usageLimited":
-      return "Usage limited";
+      return t("Usage limited");
     case "budgetLimited":
-      return "Budget limited";
+      return t("Budget limited");
     default:
       return assertNever(goal.status);
   }
@@ -2895,16 +2941,16 @@ function sameSkillSelection(left: AgentSkill[], right: AgentSkill[]) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   composerStack: {
     position: "relative",
   },
   container: {
-    borderColor: "rgba(255, 255, 255, 0.1)",
+    borderColor: theme.border,
     borderWidth: 1,
-    borderRadius: 18,
+    borderRadius: 16,
     gap: 5,
-    marginHorizontal: 18,
+    marginHorizontal: 16,
     marginBottom: 6,
     marginTop: 6,
     paddingBottom: 8,
@@ -2912,7 +2958,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   planDecisionPanel: {
-    borderColor: "rgba(255, 255, 255, 0.14)",
+    borderColor: theme.border,
     borderRadius: 18,
     borderWidth: 1,
     gap: 8,
@@ -2958,7 +3004,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   planDecisionRowSelected: {
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    backgroundColor: theme.subtle,
   },
   planContextInputRow: {
     alignItems: "center",
@@ -3033,7 +3079,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   queuePanel: {
-    borderBottomColor: "rgba(255, 255, 255, 0.08)",
+    borderBottomColor: theme.border,
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     borderWidth: 1,
@@ -3188,8 +3234,8 @@ const styles = StyleSheet.create({
   },
   queueSteerPill: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.12)",
-    borderColor: "rgba(255, 255, 255, 0.22)",
+    backgroundColor: theme.subtle,
+    borderColor: theme.border,
     borderRadius: 10,
     borderWidth: 1,
     flexDirection: "row",
@@ -3199,8 +3245,8 @@ const styles = StyleSheet.create({
     width: QUEUE_STEER_BUTTON_WIDTH,
   },
   queueSteerPillPressed: {
-    backgroundColor: "rgba(255, 255, 255, 0.22)",
-    borderColor: "rgba(255, 255, 255, 0.34)",
+    backgroundColor: theme.subtle,
+    borderColor: theme.border,
     opacity: 1,
     transform: [{ scale: 0.94 }],
   },
@@ -3220,8 +3266,8 @@ const styles = StyleSheet.create({
   },
   queueIconCircle: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: theme.subtle,
+    borderColor: theme.border,
     borderRadius: 10,
     borderWidth: 1,
     height: QUEUE_ICON_BUTTON_SIZE,
@@ -3229,8 +3275,8 @@ const styles = StyleSheet.create({
     width: QUEUE_ICON_BUTTON_SIZE,
   },
   queueIconCirclePressed: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    borderColor: "rgba(255, 255, 255, 0.32)",
+    backgroundColor: theme.subtle,
+    borderColor: theme.border,
     opacity: 1,
     transform: [{ scale: 0.94 }],
   },
@@ -3266,7 +3312,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   skillRowPressed: {
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    backgroundColor: theme.subtle,
   },
   skillIcon: {
     alignItems: "center",
@@ -3319,10 +3365,10 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: "transparent",
     fontFamily: Fonts.sansMedium,
-    fontSize: 13,
-    lineHeight: 18,
-    maxHeight: 84,
-    minHeight: 42,
+    fontSize: 15,
+    lineHeight: 22,
+    maxHeight: 132,
+    minHeight: 36,
     paddingHorizontal: 2,
     paddingTop: 0,
     paddingBottom: 0,
@@ -3333,8 +3379,8 @@ const styles = StyleSheet.create({
   },
   planModeChip: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.09)",
-    borderColor: "rgba(255, 255, 255, 0.18)",
+    backgroundColor: theme.subtle,
+    borderColor: theme.border,
     borderRadius: 12,
     borderWidth: 1,
     height: 24,
@@ -3346,7 +3392,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   planModeChipText: {
-    color: "#F2F2F2",
+    color: theme.text,
     fontFamily: Fonts.sansSemiBold,
     fontSize: 11,
     includeFontPadding: false,
@@ -3368,8 +3414,8 @@ const styles = StyleSheet.create({
   },
   attachmentChip: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
-    borderColor: "rgba(255, 255, 255, 0.16)",
+    backgroundColor: theme.subtle,
+    borderColor: theme.border,
     borderRadius: 14,
     borderWidth: 1,
     flexDirection: "row",
@@ -3380,7 +3426,7 @@ const styles = StyleSheet.create({
   },
   attachmentChipIcon: {
     alignItems: "center",
-    borderColor: "rgba(255, 255, 255, 0.22)",
+    borderColor: theme.border,
     borderRadius: 9,
     borderWidth: 1,
     height: 18,
@@ -3450,8 +3496,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   iconButton: {
-    backgroundColor: "rgba(255, 255, 255, 0.09)",
-    borderColor: "rgba(255, 255, 255, 0.18)",
+    backgroundColor: theme.subtle,
+    borderColor: theme.border,
     borderRadius: 18,
     borderWidth: 1,
     height: 36,
@@ -3466,11 +3512,11 @@ const styles = StyleSheet.create({
     width: 36,
   },
   sendButtonDisabled: {
-    backgroundColor: "rgba(243, 244, 246, 0.14)",
+    backgroundColor: theme.textSecondaryStrong,
     opacity: 0.72,
   },
   sheetSection: {
-    borderTopColor: "rgba(255, 255, 255, 0.08)",
+    borderTopColor: theme.border,
     borderTopWidth: 1,
     marginTop: 8,
     paddingTop: 10,
@@ -3516,4 +3562,4 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.75,
   },
-});
+}));

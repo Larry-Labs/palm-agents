@@ -1,7 +1,9 @@
+import { t } from "../../i18n";
 import type { RuntimeMode } from "codex-relay/api-schema";
 
 import { AppBottomSheet, SheetActionRow, SheetSelectedDot } from "@/components/ui/bottom-sheet";
 import type { AppIconName } from "@/components/ui/icon";
+import { useTheme } from "@/hooks/use-theme";
 
 export type RuntimePickerOption = {
   compactLabel: string;
@@ -25,16 +27,18 @@ export function RuntimeModeSheet({
   runtimeMode: RuntimeMode;
   visible: boolean;
 }) {
+  const theme = useTheme();
   const selectedMode = normalizeRuntimeMode(runtimeMode);
 
   return (
     <AppBottomSheet
-      title="Permissions"
-      subtitle="Set how much permission Codex can use."
+      title={t("Permissions")}
+      subtitle={t("Set how much permission Codex can use.")}
       onClose={onClose}
       visible={visible}
     >
-      {runtimeDisplayOptions.map((option) => {
+      {runtimeDisplayOptions.map((baseOption) => {
+        const option = runtimeOptionForMode(baseOption.value, theme.isDark);
         const selected = option.value === selectedMode;
         return (
           <SheetActionRow
@@ -56,11 +60,19 @@ export function RuntimeModeSheet({
   );
 }
 
-export function runtimeOptionForMode(runtimeMode: RuntimeMode) {
+export function runtimeOptionForMode(runtimeMode: RuntimeMode, isDark = true) {
   const normalized = normalizeRuntimeMode(runtimeMode);
-  return (
-    runtimeDisplayOptions.find((option) => option.value === normalized) ?? runtimeDisplayOptions[0]
-  );
+  const option =
+    runtimeDisplayOptions.find((option) => option.value === normalized) ?? runtimeDisplayOptions[0];
+  if (isDark) return option;
+  const iconTintColor =
+    normalized === "full-access" ? "#A84715" : normalized === "auto" ? "#17628C" : "#50535A";
+  return {
+    ...option,
+    iconTintColor,
+    selectedTitleColor: iconTintColor,
+    iconBackgroundColor: "rgba(0, 0, 0, 0.04)",
+  };
 }
 
 export function normalizeRuntimeMode(runtimeMode: RuntimeMode): RuntimeMode {
@@ -69,33 +81,33 @@ export function normalizeRuntimeMode(runtimeMode: RuntimeMode): RuntimeMode {
 
 const runtimeDisplayOptions: RuntimePickerOption[] = [
   {
-    compactLabel: "Default",
+    compactLabel: t("Default"),
     icon: "permissionsDefault",
     iconBackgroundColor: "rgba(255, 255, 255, 0.08)",
     iconTintColor: "rgba(243, 244, 246, 0.72)",
-    label: "Default permissions",
+    label: t("Default permissions"),
     selectedTitleColor: "rgba(243, 244, 246, 0.86)",
-    subtitle: "Ask before sensitive actions",
+    subtitle: t("Ask before sensitive actions"),
     value: "default",
   },
   {
-    compactLabel: "Auto",
+    compactLabel: t("Auto"),
     icon: "permissionsAuto",
     iconBackgroundColor: "rgba(125, 211, 252, 0.1)",
     iconTintColor: "rgba(125, 211, 252, 0.76)",
-    label: "Auto",
+    label: t("Auto"),
     selectedTitleColor: "rgba(125, 211, 252, 0.9)",
-    subtitle: "Run in workspace, ask after sandbox failures",
+    subtitle: t("Run in workspace, ask after sandbox failures"),
     value: "auto",
   },
   {
-    compactLabel: "Full access",
+    compactLabel: t("Full access"),
     icon: "permissionsFull",
     iconBackgroundColor: "rgba(255, 138, 69, 0.1)",
     iconTintColor: "rgba(255, 171, 116, 0.76)",
-    label: "Full access",
+    label: t("Full access"),
     selectedTitleColor: "rgba(255, 171, 116, 0.9)",
-    subtitle: "Run without permission prompts",
+    subtitle: t("Run without permission prompts"),
     value: "full-access",
   },
 ];

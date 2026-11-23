@@ -152,7 +152,7 @@ describe("mobile plan progress", () => {
     expect(result.visibleMessages.map((message) => message.id)).toEqual(["user-1", "assistant-1"]);
     expect(result.subagents?.agents).toEqual([
       { id: "agent-1", label: "package-inspector", status: "running" },
-      { id: "agent-2", label: "Subagent 2", status: "completed" },
+      { id: "agent-2", label: "子代理 2", status: "completed" },
     ]);
   });
 

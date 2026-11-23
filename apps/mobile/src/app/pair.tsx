@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 
 import { ChatScreen } from "@/components/chat/ChatScreen";
 import { IpadSplitLayoutProvider } from "@/components/chat/ipad-split-layout";
@@ -7,12 +7,33 @@ import { IpadSplitLayoutProvider } from "@/components/chat/ipad-split-layout";
 export default function PairScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
+  const mode = firstParam(params.mode);
+  const manualMode = mode === "manual";
   const initialPairingUrl = useMemo(() => pairingUrlFromParams(params), [params]);
-  const completePairing = useCallback(() => router.replace("/"), [router]);
+  const closeManualPairing = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/");
+    }
+  }, [router]);
+  const completePairing = useCallback(() => {
+    if (manualMode) {
+      closeManualPairing();
+    } else {
+      router.replace("/");
+    }
+  }, [closeManualPairing, manualMode, router]);
 
   return (
     <IpadSplitLayoutProvider>
-      <ChatScreen initialPairingUrl={initialPairingUrl} onPairingComplete={completePairing} />
+      {manualMode ? <Stack.Screen options={{ gestureEnabled: false }} /> : null}
+      <ChatScreen
+        initialPairingUrl={manualMode ? null : initialPairingUrl}
+        manualAddressMode={manualMode}
+        onCloseManualPairing={closeManualPairing}
+        onPairingComplete={completePairing}
+      />
     </IpadSplitLayoutProvider>
   );
 }

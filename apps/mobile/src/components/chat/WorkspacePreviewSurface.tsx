@@ -1,3 +1,5 @@
+import { useTheme } from "@/hooks/use-theme";
+import { t } from "../../i18n";
 import type { WebPreviewTarget, WorkspaceChangesResponse } from "codex-relay/api-schema";
 import { useSelector } from "@legendapp/state/react";
 import { useEffect, useRef, useState } from "react";
@@ -11,7 +13,7 @@ import { AppBottomSheet, SheetActionRow } from "@/components/ui/bottom-sheet";
 import type { AppIconName } from "@/components/ui/icon";
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
-import { Colors, Fonts, Spacing } from "@/constants/theme";
+import { Fonts, Spacing } from "@/constants/theme";
 import { hapticSelection } from "@/lib/haptics";
 import {
   addWorkspacePreviewTab,
@@ -47,12 +49,12 @@ const WORKSPACE_PREVIEW_TAB_DEFINITIONS: Record<
   git: {
     icon: "branch",
     label: "Git",
-    subtitle: "Review and publish workspace changes.",
+    subtitle: t("Review and publish workspace changes."),
   },
   files: {
     icon: "folder",
-    label: "Files",
-    subtitle: "Explore files and preview code or Markdown.",
+    label: t("Files"),
+    subtitle: t("Explore files and preview code or Markdown."),
   },
   markdown: {
     icon: "file",
@@ -61,13 +63,13 @@ const WORKSPACE_PREVIEW_TAB_DEFINITIONS: Record<
   },
   web: {
     icon: "web",
-    label: "Web",
-    subtitle: "Open a local browser preview.",
+    label: t("Web"),
+    subtitle: t("Open a local browser preview."),
   },
   ssh: {
     icon: "terminal",
     label: "SSH",
-    subtitle: "Open a workspace terminal and connect with ssh.",
+    subtitle: t("Open a workspace terminal and connect with ssh."),
   },
 };
 
@@ -106,6 +108,7 @@ export function WorkspacePreviewSurface({
   onCreatePullRequest: () => Promise<void> | void;
   onRefreshChanges: (options?: { staleTime?: number }) => Promise<void> | void;
 }) {
+  const theme = useTheme();
   const workspaceKey = workspacePreviewKey(workspacePath);
   const previewTabs = useSelector(
     () =>
@@ -220,18 +223,18 @@ export function WorkspacePreviewSurface({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={
-              sideBySide ? "Hide workspace preview" : "Back from workspace preview"
+              sideBySide ? t("Hide workspace preview") : t("Back from workspace preview")
             }
             hitSlop={6}
             onPress={onClose}
             style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
           >
-            <Icon name={sideBySide ? "x" : "back"} size={18} tintColor={Colors.dark.text} />
+            <Icon name={sideBySide ? "x" : "back"} size={18} tintColor={theme.text} />
           </Pressable>
         ) : null}
         <View style={[styles.titleGroup, sideBySide && styles.splitTitleGroup]}>
           <ThemedText type="smallBold" style={styles.title} numberOfLines={1}>
-            Preview
+            {t("Preview")}
           </ThemedText>
           {!sideBySide ? (
             <ThemedText
@@ -241,7 +244,7 @@ export function WorkspacePreviewSurface({
               numberOfLines={1}
               ellipsizeMode="middle"
             >
-              {workspaceChanges?.workspacePath ?? workspacePath ?? "Workspace"}
+              {workspaceChanges?.workspacePath ?? workspacePath ?? t("Workspace")}
             </ThemedText>
           ) : null}
         </View>
@@ -268,14 +271,14 @@ export function WorkspacePreviewSurface({
         </ScrollView>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Add workspace preview tab"
+          accessibilityLabel={t("Add workspace preview tab")}
           onPress={() => {
             hapticSelection();
             setAddTabSheetOpen(true);
           }}
           style={({ pressed }) => [styles.addTabButton, pressed && styles.pressed]}
         >
-          <Icon name="newThread" size={17} tintColor={Colors.dark.text} />
+          <Icon name="newThread" size={17} tintColor={theme.text} />
         </Pressable>
       </View>
 
@@ -283,9 +286,9 @@ export function WorkspacePreviewSurface({
         {!activeTab ? (
           <View style={styles.contentPane}>
             <View style={styles.emptyState}>
-              <ThemedText type="smallBold">No preview tabs</ThemedText>
+              <ThemedText type="smallBold">{t("No preview tabs")}</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
-                Add Git, Files, Markdown, Web, or SSH to this workspace preview.
+                {t("Add Git, Files, Markdown, Web, or SSH to this workspace preview.")}
               </ThemedText>
             </View>
           </View>
@@ -334,8 +337,8 @@ export function WorkspacePreviewSurface({
         )}
       </View>
       <AppBottomSheet
-        title="Add Tab"
-        subtitle={workspaceChanges?.workspacePath ?? workspacePath ?? "Workspace"}
+        title={t("Add Tab")}
+        subtitle={workspaceChanges?.workspacePath ?? workspacePath ?? t("Workspace")}
         onClose={() => setAddTabSheetOpen(false)}
         visible={isAddTabSheetOpen}
       >
@@ -343,7 +346,7 @@ export function WorkspacePreviewSurface({
           {availableTabs(previewTabs).map((tab) => (
             <SheetActionRow
               key={tab}
-              accessibilityLabel={`Add ${previewTabLabel(tab)} tab`}
+              accessibilityLabel={t("Add {0} tab", previewTabLabel(tab))}
               icon={previewTabIcon(tab)}
               onPress={() => addTab(tab)}
               subtitle={previewTabSubtitle(tab)}
@@ -353,11 +356,11 @@ export function WorkspacePreviewSurface({
           {availableTabs(previewTabs).length === 0 ? (
             <View
               accessible
-              accessibilityLabel="All available tabs are already open."
+              accessibilityLabel={t("All available tabs are already open.")}
               style={styles.addTabEmpty}
             >
               <ThemedText type="small" themeColor="textSecondary">
-                All available tabs are already open.
+                {t("All available tabs are already open.")}
               </ThemedText>
             </View>
           ) : null}
@@ -378,11 +381,12 @@ function WorkspaceTab({
   onClose: () => void;
   onPress: () => void;
 }) {
+  const theme = useTheme();
   return (
     <Pressable
       accessibilityRole="tab"
       accessibilityState={{ selected: active }}
-      accessibilityLabel={`Show ${previewTabLabel(tab)} tab`}
+      accessibilityLabel={t("Show {0} tab", previewTabLabel(tab))}
       onPress={onPress}
       style={({ pressed }) => [
         styles.workspaceTab,
@@ -393,7 +397,7 @@ function WorkspaceTab({
       <Icon
         name={previewTabIcon(tab)}
         size={14}
-        tintColor={active ? Colors.dark.text : Colors.dark.textSecondary}
+        tintColor={active ? theme.text : theme.textSecondary}
       />
       <Text
         numberOfLines={1}
@@ -403,7 +407,7 @@ function WorkspaceTab({
       </Text>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Close ${previewTabLabel(tab)} tab`}
+        accessibilityLabel={t("Close {0} tab", previewTabLabel(tab))}
         hitSlop={8}
         onPress={(event) => {
           event.stopPropagation();
@@ -411,7 +415,7 @@ function WorkspaceTab({
         }}
         style={({ pressed }) => [styles.workspaceTabClose, pressed && styles.pressed]}
       >
-        <Icon name="x" size={13} tintColor={Colors.dark.textSecondary} />
+        <Icon name="x" size={13} tintColor={theme.textSecondary} />
       </Pressable>
     </Pressable>
   );
@@ -437,9 +441,9 @@ const workspacePreviewTabEnterTransition = FadeIn.duration(110);
 const workspacePreviewTabExitTransition = FadeOut.duration(80);
 const workspacePreviewTabLayoutTransition = LinearTransition.duration(120);
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   screen: {
-    backgroundColor: Colors.dark.background,
+    backgroundColor: theme.background,
     flex: 1,
   },
   header: {
@@ -459,7 +463,7 @@ const styles = StyleSheet.create({
   },
   iconButton: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    backgroundColor: theme.subtle,
     borderColor: "rgba(132, 145, 165, 0.24)",
     borderRadius: 18,
     borderWidth: 1,
@@ -486,7 +490,7 @@ const styles = StyleSheet.create({
   },
   tabStrip: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.055)",
+    backgroundColor: theme.subtle,
     borderColor: "rgba(132, 145, 165, 0.22)",
     borderRadius: 8,
     borderWidth: 1,
@@ -521,11 +525,11 @@ const styles = StyleSheet.create({
     paddingRight: Spacing.one,
   },
   workspaceTabActive: {
-    backgroundColor: "rgba(255, 255, 255, 0.12)",
-    borderColor: "rgba(255, 255, 255, 0.16)",
+    backgroundColor: theme.subtle,
+    borderColor: theme.border,
   },
   workspaceTabText: {
-    color: Colors.dark.textSecondary,
+    color: theme.textSecondary,
     flex: 1,
     fontFamily: Fonts.sansBold,
     fontSize: 13,
@@ -533,7 +537,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   workspaceTabTextActive: {
-    color: Colors.dark.text,
+    color: theme.text,
   },
   workspaceTabClose: {
     alignItems: "center",
@@ -544,7 +548,7 @@ const styles = StyleSheet.create({
   },
   addTabButton: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.07)",
+    backgroundColor: theme.subtle,
     borderColor: "transparent",
     borderRadius: 6,
     borderWidth: 1,
@@ -577,7 +581,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.four,
   },
   emptyState: {
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    backgroundColor: theme.subtle,
     borderColor: "rgba(132, 145, 165, 0.2)",
     borderRadius: 8,
     borderWidth: 1,
@@ -587,4 +591,4 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.7,
   },
-});
+}));

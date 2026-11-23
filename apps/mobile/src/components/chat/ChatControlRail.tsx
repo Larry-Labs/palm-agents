@@ -1,3 +1,5 @@
+import { t } from "../../i18n";
+import { useTheme } from "@/hooks/use-theme";
 import { Pressable, View, type StyleProp, type ViewStyle } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -26,7 +28,7 @@ export function ChatControlRail({
     <View style={styles.container}>
       <View style={styles.controlRail}>
         <ControlPillButton
-          accessibilityLabel={`Runtime mode ${runtimeOption.compactLabel}`}
+          accessibilityLabel={t("Runtime mode {0}", runtimeOption.compactLabel)}
           icon={runtimeOption.icon}
           label={runtimeOption.compactLabel}
           onPress={onRuntimePress}
@@ -34,7 +36,7 @@ export function ChatControlRail({
           tintColor={runtimeOption.iconTintColor}
         />
         <ControlPillButton
-          accessibilityLabel={`Model ${modelLabel}`}
+          accessibilityLabel={t("Model {0}", modelLabel)}
           disabled={modelDisabled}
           icon={isFastModeEnabled ? "fast" : undefined}
           label={modelLabel}
@@ -56,7 +58,7 @@ function ControlPillButton({
   onPress,
   style,
   textAlign,
-  tintColor = "rgba(243, 244, 246, 0.72)",
+  tintColor,
 }: {
   accessibilityLabel: string;
   disabled?: boolean;
@@ -67,6 +69,8 @@ function ControlPillButton({
   textAlign?: "center";
   tintColor?: string;
 }) {
+  const theme = useTheme();
+  const resolvedTintColor = tintColor ?? theme.textSecondaryStrong;
   return (
     <Pressable
       accessible
@@ -81,14 +85,14 @@ function ControlPillButton({
           <View style={styles.controlButtonContent}>
             {icon ? (
               <View style={styles.controlButtonIconSlot}>
-                <Icon name={icon} size={12} strokeWidth={1.9} tintColor={tintColor} />
+                <Icon name={icon} size={12} strokeWidth={1.9} tintColor={resolvedTintColor} />
               </View>
             ) : null}
             <Text
               numberOfLines={1}
               style={[
                 styles.controlButtonLabel,
-                { color: tintColor },
+                { color: resolvedTintColor },
                 textAlign === "center" ? styles.controlButtonLabelCentered : null,
               ]}
             >
@@ -101,7 +105,7 @@ function ControlPillButton({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   container: {
     alignSelf: "stretch",
     flex: 1,
@@ -124,8 +128,8 @@ const styles = StyleSheet.create({
   },
   controlButton: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
-    borderColor: "rgba(255, 255, 255, 0.09)",
+    backgroundColor: theme.subtle,
+    borderColor: theme.border,
     borderCurve: "continuous",
     borderRadius: 12,
     borderWidth: 1,
@@ -172,4 +176,4 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.72,
   },
-});
+}));

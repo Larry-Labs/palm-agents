@@ -1,9 +1,10 @@
+import { useTheme } from "@/hooks/use-theme";
 import { Pressable, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 import { ThemedText } from "@/components/themed-text";
 import { Icon, type AppIconName } from "@/components/ui/icon";
-import { Colors } from "@/constants/theme";
+
 import { hapticSelection } from "@/lib/haptics";
 
 export type ChatShellAction = {
@@ -51,6 +52,7 @@ export function ChatShellHeader({
 }
 
 function HeaderButton({ action }: { action: ChatShellAction }) {
+  const theme = useTheme();
   return (
     <Pressable
       accessibilityLabel={action.label}
@@ -66,19 +68,19 @@ function HeaderButton({ action }: { action: ChatShellAction }) {
         pressed && styles.pressed,
       ]}
     >
-      <Icon name={action.icon} size={17} tintColor={Colors.dark.text} />
+      <Icon name={action.icon} size={17} tintColor={theme.text} />
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   header: {
     alignItems: "center",
     elevation: 4,
     flexDirection: "row",
-    gap: 10,
+    gap: 8,
     paddingBottom: 8,
-    paddingHorizontal: 18,
+    paddingHorizontal: 12,
     paddingTop: 6,
     zIndex: 4,
   },
@@ -86,19 +88,19 @@ const styles = StyleSheet.create({
     elevation: 6,
     flexDirection: "row",
     flexShrink: 0,
-    gap: 10,
+    gap: 4,
     zIndex: 6,
   },
   headerButton: {
     alignItems: "center",
-    backgroundColor: "rgba(42, 42, 42, 0.8)",
-    borderColor: "rgba(255, 255, 255, 0.08)",
-    borderRadius: 18,
-    borderWidth: 1,
-    height: 36,
+    backgroundColor: "transparent",
+    borderColor: theme.border,
+    borderRadius: 8,
+    borderWidth: 0,
+    height: 44,
     justifyContent: "center",
     position: "relative",
-    width: 36,
+    width: 44,
     zIndex: 7,
   },
   headerButtonDisabled: {
@@ -112,17 +114,17 @@ const styles = StyleSheet.create({
     lineHeight: 14,
     maxWidth: "100%",
     opacity: 0.84,
-    textAlign: "center",
+    textAlign: "left",
   },
   title: {
     fontSize: 17,
     lineHeight: 22,
-    textAlign: "center",
+    textAlign: "left",
   },
   titleGroup: {
-    alignItems: "center",
+    alignItems: "flex-start",
     flex: 1,
     flexShrink: 1,
     minWidth: 0,
   },
-});
+}));

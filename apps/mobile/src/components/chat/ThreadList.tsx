@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { LegendList, type LegendListRenderItemProps } from "@legendapp/list/react-native";
 import type { ThreadSummary } from "codex-relay/api-schema";
 import { memo, useCallback } from "react";
@@ -72,7 +73,7 @@ const ThreadListItem = memo(function ThreadListItem({
         {thread.title}
       </ThemedText>
       <ThemedText type="code" themeColor="textSecondary" numberOfLines={1}>
-        {thread.state} · {thread.messageCount} messages
+        {thread.state} · {thread.messageCount} {t("messages")}
       </ThemedText>
     </Pressable>
   );

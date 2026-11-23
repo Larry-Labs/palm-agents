@@ -11,23 +11,39 @@ const publicKey = readFileSync(
 );
 
 for (const format of ["module", "commonjs"]) {
-  test(`Hot Updater reads the Expo OTA signing key through its ${format} entry`, () => {
-    const load =
-      format === "module"
-        ? 'import { getExpoBundleSigningPublicKey } from "@hot-updater/expo";'
-        : 'const { getExpoBundleSigningPublicKey } = require("@hot-updater/expo");';
-    // A real Node process exercises package exports; a test bundler can hide
-    // the Expo 58 resolution failure that otherwise blocks OTA deployment.
-    const output = execFileSync(
-      process.execPath,
-      [
-        `--input-type=${format}`,
-        "--eval",
-        `${load}\ngetExpoBundleSigningPublicKey(process.cwd()).then(value => console.log(JSON.stringify(value)));`,
-      ],
-      { cwd: appDirectory, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-    );
+  for (const configured of [false, true]) {
+    test(`Hot Updater ${configured ? "reads the configured signing key" : "stays disabled by default"} through its ${format} entry`, () => {
+      const load =
+        format === "module"
+          ? 'import { getExpoBundleSigningPublicKey } from "@hot-updater/expo";'
+          : 'const { getExpoBundleSigningPublicKey } = require("@hot-updater/expo");';
+      // A real Node process exercises package exports; a test bundler can hide
+      // the Expo 58 resolution failure that otherwise blocks OTA deployment.
+      const output = execFileSync(
+        process.execPath,
+        [
+          `--input-type=${format}`,
+          "--eval",
+          `${load}\ngetExpoBundleSigningPublicKey(process.cwd()).then(value => console.log(JSON.stringify(value)));`,
+        ],
+        {
+          cwd: appDirectory,
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "pipe"],
+          env: {
+            ...process.env,
+            EXPO_PUBLIC_HOT_UPDATER_BASE_URL: configured ? "https://updates.example.invalid" : "",
+            HOT_UPDATER_PUBLIC_KEY_PATH: configured ? "./keys/public-key.pem" : "",
+          },
+        },
+      );
 
-    assert.equal(JSON.parse(output).publicKey.trim(), publicKey.trim());
-  });
+      const result = JSON.parse(output);
+      if (configured) {
+        assert.equal(result.publicKey.trim(), publicKey.trim());
+      } else {
+        assert.equal(result, null);
+      }
+    });
+  }
 }

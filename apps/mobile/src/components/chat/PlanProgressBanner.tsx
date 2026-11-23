@@ -1,3 +1,5 @@
+import { useTheme } from "@/hooks/use-theme";
+import { t } from "../../i18n";
 import { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 import Animated, {
@@ -38,6 +40,7 @@ export function PlanProgressBanner({
   progress?: TimelinePlanProgress;
   subagents?: TimelineSubagentSummary;
 }) {
+  const theme = useTheme();
   const [isExpanded, setExpanded] = useState(false);
 
   if (!progress) {
@@ -50,13 +53,18 @@ export function PlanProgressBanner({
   const subagentCount = subagents?.agents.length ?? 0;
   const subagentText = subagents ? subagentStatusText(subagents.agents) : undefined;
   const subagentAccessibilityText = subagentText
-    ? `, ${subagentCount} subagents, ${subagentText}`
+    ? t(", {0} subagents, {1}", subagentCount, subagentText)
     : "";
 
   return (
     <Animated.View entering={FadeIn.duration(160)} style={styles.bannerHost}>
       <Pressable
-        accessibilityLabel={`Plan progress: ${completedStepCount} of ${stepCount} steps completed${subagentAccessibilityText}`}
+        accessibilityLabel={t(
+          "Plan progress: {0} of {1} steps completed{2}",
+          completedStepCount,
+          stepCount,
+          subagentAccessibilityText,
+        )}
         accessibilityRole="button"
         accessibilityState={{ expanded: isExpanded }}
         accessibilityValue={{ max: stepCount, min: 0, now: completedStepCount }}
@@ -68,12 +76,12 @@ export function PlanProgressBanner({
       >
         <View style={styles.summaryContent}>
           <ThemedText type="code" style={styles.label}>
-            Plan
+            {t("Plan")}
           </ThemedText>
           <View style={styles.summaryRow}>
             {activeStep ? <PlanProgressMarker status={activeStep.status} /> : null}
             <ThemedText type="small" numberOfLines={1} style={styles.summaryText}>
-              {activeStep ? activeStep.text : "Updating plan"}
+              {activeStep ? activeStep.text : t("Updating plan")}
             </ThemedText>
             <View style={styles.trailingGroup}>
               {subagents ? (
@@ -90,7 +98,7 @@ export function PlanProgressBanner({
               <Icon
                 name={isExpanded ? "expand" : "chevronRight"}
                 size={16}
-                tintColor={Colors.dark.textSecondary}
+                tintColor={theme.textSecondary}
               />
             </View>
           </View>
@@ -121,14 +129,14 @@ export function PlanProgressBanner({
           {subagents ? (
             <Animated.View
               accessible
-              accessibilityLabel={`${subagentCount} subagents, ${subagentText}`}
+              accessibilityLabel={t("{0} subagents, {1}", subagentCount, subagentText)}
               entering={FadeIn.duration(120)}
               style={styles.subagentSection}
             >
               <View style={styles.subagentSectionHeader}>
-                <Icon name="branch" size={12} tintColor={Colors.dark.textSecondary} />
+                <Icon name="branch" size={12} tintColor={theme.textSecondary} />
                 <ThemedText type="code" style={styles.subagentLabel}>
-                  Subagents
+                  {t("Subagents")}
                 </ThemedText>
               </View>
               <View style={styles.subagentSummaryRow}>
@@ -185,10 +193,10 @@ function subagentGlyphStyle(index: number) {
 function subagentStatusText(agents: readonly TimelineSubagent[]) {
   const counts = subagentStatusCounts(agents);
   const segments = [
-    counts.running > 0 ? `${counts.running} active` : undefined,
-    counts.completed > 0 ? `${counts.completed} done` : undefined,
-    counts.interrupted > 0 ? `${counts.interrupted} stopped` : undefined,
-    counts.failed > 0 ? `${counts.failed} failed` : undefined,
+    counts.running > 0 ? t("{0} active", counts.running) : undefined,
+    counts.completed > 0 ? t("{0} done", counts.completed) : undefined,
+    counts.interrupted > 0 ? t("{0} stopped", counts.interrupted) : undefined,
+    counts.failed > 0 ? t("{0} failed", counts.failed) : undefined,
   ];
 
   return segments.filter((segment): segment is string => Boolean(segment)).join(" · ");
@@ -210,11 +218,11 @@ function subagentStatusCounts(agents: readonly TimelineSubagent[]) {
 function planProgressStatusLabel(status: TimelinePlanProgressStepStatus) {
   switch (status) {
     case "completed":
-      return "Completed";
+      return t("Completed");
     case "inProgress":
-      return "In progress";
+      return t("In progress");
     case "pending":
-      return "Pending";
+      return t("Pending");
   }
 }
 
@@ -253,10 +261,10 @@ function PlanProgressMarker({ status }: { status: TimelinePlanProgressStepStatus
   return <View style={[styles.marker, styles.markerPending]} />;
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   banner: {
-    backgroundColor: "rgba(42, 42, 42, 0.9)",
-    borderColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: theme.backgroundElement,
+    borderColor: theme.border,
     borderRadius: 10,
     borderWidth: 1,
     paddingHorizontal: Spacing.three,
@@ -274,7 +282,7 @@ const styles = StyleSheet.create({
     opacity: 0.78,
   },
   countText: {
-    color: Colors.dark.textSecondary,
+    color: theme.textSecondary,
     fontSize: 11,
   },
   compactSubagents: {
@@ -284,8 +292,8 @@ const styles = StyleSheet.create({
     marginRight: Spacing.half,
   },
   expandedPanel: {
-    backgroundColor: "rgba(42, 42, 42, 0.96)",
-    borderColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: theme.backgroundElement,
+    borderColor: theme.border,
     borderRadius: 10,
     borderWidth: 1,
     elevation: 20,
@@ -331,12 +339,12 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
   stepText: {
-    color: Colors.dark.text,
+    color: theme.text,
     flex: 1,
     lineHeight: 18,
   },
   stepTextPending: {
-    color: Colors.dark.textSecondary,
+    color: theme.textSecondary,
   },
   summaryRow: {
     alignItems: "center",
@@ -347,7 +355,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   summaryText: {
-    color: Colors.dark.text,
+    color: theme.text,
     flex: 1,
     lineHeight: 20,
     minWidth: 0,
@@ -358,7 +366,7 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
   },
   subagentCountText: {
-    color: Colors.dark.textSecondary,
+    color: theme.textSecondary,
     fontSize: 10,
   },
   subagentGlyph: {
@@ -373,12 +381,12 @@ const styles = StyleSheet.create({
     gap: Spacing.half,
   },
   subagentLabel: {
-    color: Colors.dark.textSecondaryStrong,
+    color: theme.textSecondaryStrong,
     fontSize: 11,
     lineHeight: 15,
   },
   subagentSection: {
-    borderTopColor: "rgba(255, 255, 255, 0.08)",
+    borderTopColor: theme.border,
     borderTopWidth: 1,
     gap: Spacing.one,
     marginTop: Spacing.one,
@@ -390,7 +398,7 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
   },
   subagentStatusText: {
-    color: Colors.dark.textSecondary,
+    color: theme.textSecondary,
     flex: 1,
     fontSize: 10,
     lineHeight: 14,
@@ -402,4 +410,4 @@ const styles = StyleSheet.create({
     minHeight: 16,
     paddingLeft: Spacing.three,
   },
-});
+}));

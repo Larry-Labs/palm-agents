@@ -53,6 +53,7 @@ export type PairingSessionStore = {
     clientSessionId: string,
   ): Promise<PushNotificationSubscription | undefined>;
   getValidSession(tokenHash: string): Promise<ClientSession | undefined>;
+  getSecureSessionByClientId(clientSessionId: string): Promise<SecureSession | undefined>;
   listActivePushNotificationSubscriptions(): Promise<PushNotificationSubscription[]>;
   pruneExpiredPendingPairings(now: number): Promise<void>;
   rotateSession(
@@ -110,6 +111,9 @@ export async function createTursoPairingSessionStore(path: string): Promise<Pair
     );
   `);
   await ensurePairingSessionColumns();
+  await db.exec(
+    "CREATE INDEX IF NOT EXISTS pairing_sessions_client_session_id ON pairing_sessions(client_session_id)",
+  );
   await ensurePushNotificationSubscriptionColumns();
 
   async function countActive() {
@@ -328,6 +332,22 @@ export async function createTursoPairingSessionStore(path: string): Promise<Pair
         expiresAt: Number(row.expiresAt),
         secureSession: decodeSecureSession(row),
       };
+    },
+    async getSecureSessionByClientId(clientSessionId) {
+      const row = await db
+        .prepare(
+          `SELECT key_epoch AS keyEpoch,
+                  mobile_to_server_key AS mobileToServerKey,
+                  server_to_mobile_key AS serverToMobileKey,
+                  last_mobile_counter AS lastMobileCounter,
+                  next_server_counter AS nextServerCounter
+           FROM pairing_sessions
+           WHERE client_session_id = ?
+           ORDER BY updated_at DESC
+           LIMIT 1`,
+        )
+        .get(clientSessionId);
+      return row ? decodeSecureSession(row) : undefined;
     },
     async listActivePushNotificationSubscriptions() {
       const rows = await db

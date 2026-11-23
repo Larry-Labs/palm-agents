@@ -1,3 +1,5 @@
+import { useTheme } from "@/hooks/use-theme";
+import { t } from "../../i18n";
 import * as Clipboard from "expo-clipboard";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -19,7 +21,7 @@ const copiedIndicatorDurationMs = 1400;
 
 export function CopyableCommand({
   command,
-  copyAccessibilityLabel = "Copy command",
+  copyAccessibilityLabel = t("Copy command"),
   style,
   textStyle,
 }: {
@@ -28,13 +30,14 @@ export function CopyableCommand({
   style?: ViewProps["style"];
   textStyle?: StyleProp<TextStyle>;
 }) {
+  const theme = useTheme();
   const [isCopied, setCopied] = useState(false);
   const handleCopyPress = useCallback(() => {
     hapticSelection();
     setCopied(true);
     Clipboard.setStringAsync(command).catch((error: unknown) => {
       setCopied(false);
-      Alert.alert("Copy failed", copyFailureMessage(error));
+      Alert.alert(t("Copy failed"), copyFailureMessage(error));
     });
   }, [command]);
 
@@ -53,8 +56,8 @@ export function CopyableCommand({
         {command}
       </ThemedText>
       <Pressable
-        accessibilityHint="Copies this command to the clipboard"
-        accessibilityLabel={isCopied ? "Command copied" : copyAccessibilityLabel}
+        accessibilityHint={t("Copies this command to the clipboard")}
+        accessibilityLabel={isCopied ? t("Command copied") : copyAccessibilityLabel}
         accessibilityRole="button"
         hitSlop={8}
         onPress={handleCopyPress}
@@ -64,9 +67,14 @@ export function CopyableCommand({
           pressed && styles.pressed,
         ]}
       >
-        <Icon name={isCopied ? "check" : "copy"} size={12} strokeWidth={2.2} tintColor="#F2F2F2" />
+        <Icon
+          name={isCopied ? "check" : "copy"}
+          size={12}
+          strokeWidth={2.2}
+          tintColor={theme.text}
+        />
         <ThemedText type="smallBold" style={styles.copyButtonText}>
-          {isCopied ? "Copied" : "Copy"}
+          {isCopied ? t("Copied") : t("Copy")}
         </ThemedText>
       </Pressable>
     </View>
@@ -74,14 +82,14 @@ export function CopyableCommand({
 }
 
 function copyFailureMessage(error: unknown) {
-  return error instanceof Error ? error.message : "The command could not be copied.";
+  return error instanceof Error ? error.message : t("The command could not be copied.");
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   container: {
     alignItems: "center",
     backgroundColor: "rgba(0, 0, 0, 0.24)",
-    borderColor: "rgba(255, 255, 255, 0.08)",
+    borderColor: theme.border,
     borderRadius: 7,
     borderWidth: 1,
     flexDirection: "row",
@@ -102,8 +110,8 @@ const styles = StyleSheet.create({
   copyButton: {
     alignItems: "center",
     alignSelf: "stretch",
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-    borderColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: theme.subtle,
+    borderColor: theme.border,
     borderRadius: 6,
     borderWidth: 1,
     flexDirection: "row",
@@ -119,11 +127,11 @@ const styles = StyleSheet.create({
     borderColor: "rgba(86, 196, 134, 0.3)",
   },
   copyButtonText: {
-    color: "#F2F2F2",
+    color: theme.text,
     fontSize: 11,
     lineHeight: 14,
   },
   pressed: {
     opacity: 0.7,
   },
-});
+}));

@@ -119,32 +119,25 @@ describe("mobile model picker options", () => {
         reasoningEffort: "ultra",
       },
     ]);
-    expect(selections.map(powerSelectionLabel)).toEqual([
-      "Low",
-      "Medium",
-      "High",
-      "Extra High",
-      "Max",
-      "Ultra",
-    ]);
+    expect(selections.map(powerSelectionLabel)).toEqual(["低", "中", "高", "超高", "最高", "极致"]);
     expect(selections.map(powerSelectionAccessibilityLabel)).toEqual([
-      "GPT-5.6-Sol Low",
-      "GPT-5.6-Sol Medium",
-      "GPT-5.6-Sol High",
-      "GPT-5.6-Sol Extra High",
-      "GPT-5.6-Sol Max",
-      "GPT-5.6-Sol Ultra",
+      "GPT-5.6-Sol 低",
+      "GPT-5.6-Sol 中",
+      "GPT-5.6-Sol 高",
+      "GPT-5.6-Sol 超高",
+      "GPT-5.6-Sol 最高",
+      "GPT-5.6-Sol 极致",
     ]);
   });
 
   it("shows every source-provided effort in Advanced", () => {
     expect(reasoningDisplayOptions(models[0])).toEqual([
-      { label: "Low", subtitle: "low description", value: "low" },
-      { label: "Medium", subtitle: "medium description", value: "medium" },
-      { label: "High", subtitle: "high description", value: "high" },
-      { label: "Extra High", subtitle: "xhigh description", value: "xhigh" },
-      { label: "Max", subtitle: "max description", value: "max" },
-      { label: "Ultra", subtitle: "Consumes usage limits faster", value: "ultra" },
+      { label: "低", subtitle: "low description", value: "low" },
+      { label: "中", subtitle: "medium description", value: "medium" },
+      { label: "高", subtitle: "high description", value: "high" },
+      { label: "超高", subtitle: "xhigh description", value: "xhigh" },
+      { label: "最高", subtitle: "max description", value: "max" },
+      { label: "极致", subtitle: "会消耗更多额度", value: "ultra" },
     ]);
     expect(
       normalizeRuntimePreferencesForModels(models, {
@@ -169,12 +162,12 @@ describe("mobile model picker options", () => {
   it("shows the exact Advanced speed choices", () => {
     expect(speedDisplayOptions(models[0])).toEqual([
       {
-        label: "Standard",
-        subtitle: "Standard speed and usage",
+        label: "标准",
+        subtitle: "标准速度与用量",
         value: undefined,
       },
       {
-        label: "Fast",
+        label: "快速",
         subtitle: "1.5x speed, more usage",
         value: "priority",
       },
@@ -184,7 +177,7 @@ describe("mobile model picker options", () => {
         ...models[0],
         serviceTiers: [{ id: "priority", name: "Fast", description: "2x speed, increased usage" }],
       }).at(-1),
-    ).toEqual({ label: "Fast", subtitle: "2x speed, increased usage", value: "priority" });
+    ).toEqual({ label: "快速", subtitle: "2x speed, increased usage", value: "priority" });
   });
 
   it("keeps custom model effort and speed controls usable", () => {
@@ -198,13 +191,13 @@ describe("mobile model picker options", () => {
     ]);
     expect(speedDisplayOptions(undefined, "priority")).toEqual([
       {
-        label: "Standard",
-        subtitle: "Standard speed and usage",
+        label: "标准",
+        subtitle: "标准速度与用量",
         value: undefined,
       },
       {
-        label: "Custom",
-        subtitle: "Service tier: priority",
+        label: "自定义",
+        subtitle: "服务等级：priority",
         value: "priority",
       },
     ]);
@@ -212,16 +205,16 @@ describe("mobile model picker options", () => {
 
   it("uses warning-only copy for Ultra and preserves custom model labels", () => {
     expect(reasoningDisplayOptions(models[0]).at(-1)).toEqual({
-      label: "Ultra",
-      subtitle: "Consumes usage limits faster",
+      label: "极致",
+      subtitle: "会消耗更多额度",
       value: "ultra",
     });
-    expect(modelButtonLabel(undefined, "high", "custom-model")).toBe("custom-model High");
+    expect(modelButtonLabel(undefined, "high", "custom-model")).toBe("custom-model 高");
   });
 
   it("uses the source title for a stored Max value", () => {
-    expect(modelButtonLabel(models[0], "max")).toBe("GPT-5.6-Sol Max");
-    expect(reasoningTitle("max")).toBe("Max");
+    expect(modelButtonLabel(models[0], "max")).toBe("GPT-5.6-Sol 最高");
+    expect(reasoningTitle("max")).toBe("最高");
   });
 
   it("formats opaque reasoning values without prototype-key collisions", () => {
