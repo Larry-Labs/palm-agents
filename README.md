@@ -4,6 +4,8 @@ Palm Agents is an independent iPhone client based on [Codex Relay](https://githu
 
 The development branch is `dev/palm-agents`. See [the development and build guide](./docs/iphone-cn.md) for current features, limitations, and iOS build instructions. A signed Palm Agents app has not been released yet.
 
+To start Palm Agents Relay on your computer or NAS, run `npx @larry-labs/palm-agents-relay@latest` from the workspace you want to use. Scan the QR code in Palm Agents to pair.
+
 <details>
 <summary>Original Codex Relay documentation and attribution</summary>
 

@@ -14,7 +14,7 @@ const mobileChangelogPath = resolve(workspaceRoot, "apps/mobile/CHANGELOG.md");
 const changesetDirectory = resolve(workspaceRoot, ".changeset");
 const ignoredPackagesByTarget = {
   npm: [mobilePackageName, "react-native-direct-fetch"],
-  mobile: ["codex-relay", "react-native-direct-fetch"],
+  mobile: ["@larry-labs/palm-agents-relay", "react-native-direct-fetch"],
 };
 
 function main() {

@@ -18,12 +18,14 @@ describe("background relay pid detection", () => {
     expect(pid).toBeUndefined();
   });
 
-  it("returns a live pid when the process command belongs to codex-relay", async () => {
+  it.each([
+    "/Users/gronxb/.local/bin/node --import loader.mjs src/cli.ts --dangerously-auto-approve",
+    "/usr/bin/node /tmp/node_modules/@larry-labs/palm-agents-relay/dist/cli.js",
+  ])("returns a live pid for the relay command %s", async (command) => {
     const pidPath = await writePidFile("77542");
 
     const pid = await readRunningRelayPid(pidPath, {
-      commandReader: async () =>
-        "/Users/gronxb/.local/bin/node --import loader.mjs src/cli.ts --dangerously-auto-approve",
+      commandReader: async () => command,
       isProcessAlive: () => true,
     });
 

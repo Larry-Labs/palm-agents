@@ -20,7 +20,7 @@ describe("relay version policy", () => {
     const requiredVersion = "1.6.0";
 
     expect(relayCompatibilityPolicy.packageVersion).toBe(requiredVersion);
-    expect(relayUpdateCommand).toBe("npx codex-relay@latest");
+    expect(relayUpdateCommand).toBe("npx @larry-labs/palm-agents-relay@latest");
     for (const olderVersion of ["1.4.14", "1.5.0", "1.5.3"]) {
       expect(evaluateRelayVersion(relayVersion(olderVersion), undefined)).toMatchObject({
         compatible: false,

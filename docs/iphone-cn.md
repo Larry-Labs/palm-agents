@@ -45,7 +45,23 @@ pnpm install --frozen-lockfile
 pnpm dev:mobile:ios
 ```
 
-配对本机或其他电脑时，在客户端内扫描该电脑 Relay 的二维码。不要将配对凭据提交到仓库。
+## 启动 Relay 并配对
+
+在要运行 Codex 的电脑或 NAS 上，从工作目录启动 Palm Agents Relay：
+
+```sh
+npx @larry-labs/palm-agents-relay@latest
+```
+
+用 Palm Agents 扫描终端打印的二维码。手机显示审批码时，在运行 Relay 的终端核对后输入 `y`。如果 Relay 在后台运行，也可以在该机器上执行：
+
+```sh
+npx @larry-labs/palm-agents-relay@latest approve XXXX-XXXX
+```
+
+Relay 支持 Node.js 22.14 或更新版本，运行机器需要安装并登录 Codex CLI。不要将配对凭据提交到仓库。
+
+## 发布配置
 
 使用 EAS 构建或推送通知前，先关联自己的 Expo 项目并设置 `EAS_PROJECT_ID`；没有沿用上游项目 ID。提交 App Store 前需选择自己的 App Store Connect 应用；EAS 配置没有预填上游商店应用 ID。OTA 默认关闭；独立配置 `EXPO_PUBLIC_HOT_UPDATER_BASE_URL` 和 `HOT_UPDATER_PUBLIC_KEY_PATH` 后才启用相应原生构建插件。
 

@@ -1,4 +1,6 @@
-export const relayStartCommand = "npx codex-relay@latest";
+import { relayInstallCommand } from "../../constants/brand";
+
+export const relayStartCommand = relayInstallCommand;
 
 export function approvalCommand(approvalCode: string, serverUrl?: string) {
   const port = approvalPort(serverUrl);

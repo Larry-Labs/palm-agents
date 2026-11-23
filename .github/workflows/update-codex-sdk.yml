@@ -46,9 +46,9 @@ jobs:
             exit 0
           fi
 
-          pnpm --filter codex-relay add "@openai/codex@$codex_cli_version" "@openai/codex-sdk@$latest_version" --save-exact --lockfile-only
+          pnpm --filter @larry-labs/palm-agents-relay add "@openai/codex@$codex_cli_version" "@openai/codex-sdk@$latest_version" --save-exact --lockfile-only
           changeset_path=".changeset/update-codex-sdk-$latest_version.md"
-          printf -- '---\n"codex-relay": patch\n---\n\nUpdate `@openai/codex-sdk` to `%s` and pin its Codex CLI `%s` for app-server compatibility.\n' "$latest_version" "$codex_cli_version" > "$changeset_path"
+          printf -- '---\n"@larry-labs/palm-agents-relay": patch\n---\n\nUpdate `@openai/codex-sdk` to `%s` and pin its Codex CLI `%s` for app-server compatibility.\n' "$latest_version" "$codex_cli_version" > "$changeset_path"
           echo "changed=true" >> "$GITHUB_OUTPUT"
           echo "changeset=$changeset_path" >> "$GITHUB_OUTPUT"
           echo "version=$latest_version" >> "$GITHUB_OUTPUT"
@@ -57,10 +57,10 @@ jobs:
         if: steps.update.outputs.changed == 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Build codex-relay
+      - name: Build Palm Agents Relay
         if: steps.update.outputs.changed == 'true'
         # Mobile tests import codex-relay/api-schema, which resolves to dist.
-        run: pnpm --filter codex-relay build
+        run: pnpm --filter @larry-labs/palm-agents-relay build
 
       - name: Test
         if: steps.update.outputs.changed == 'true'
@@ -96,7 +96,7 @@ jobs:
           UPDATE_BRANCH: automation/update-codex-sdk
         run: |
           title="chore: update @openai/codex-sdk to $CODEX_SDK_VERSION"
-          body="Update @openai/codex-sdk to $CODEX_SDK_VERSION and add a codex-relay patch changeset."
+          body="Update @openai/codex-sdk to $CODEX_SDK_VERSION and add a Palm Agents Relay patch changeset."
           pull_request="$(gh pr list --base main --head "$UPDATE_BRANCH" --state open --json number --jq '.[0].number')"
 
           if [[ -n "$pull_request" ]]; then

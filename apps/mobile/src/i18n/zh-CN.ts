@@ -58,7 +58,7 @@ export const zhCN = {
   "Speed {0}": "速度 {0}",
   "Steer queued prompt {0}": "用排队指令 {0} 调整方向",
   "Subagent {0}": "子代理 {0}",
-  "This app expects codex-relay {0}.x.": "此应用需要 codex-relay {0}.x。",
+  "This app expects a {0}.x relay.": "此应用需要 {0}.x 版本的 Relay。",
   "Use {0}": "使用 {0}",
   "Use {0} reasoning": "使用{0}推理",
   "Version {0}": "版本 {0}",

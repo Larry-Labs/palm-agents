@@ -1,21 +1,21 @@
-# Codex Relay CLI
+# Palm Agents Relay
 
-Codex Relay runs a local bridge server for the Codex Relay mobile app. Keep Codex on your computer, then use your phone to pair with that local session, send prompts, watch streamed output, and respond to approval requests.
+Palm Agents Relay runs a local bridge for the Palm Agents mobile app. Keep Codex on your computer, then use your phone to pair with that local session, send prompts, watch streamed output, and respond to approval requests.
 
-Codex Relay is an independent project. It is not affiliated with, endorsed by, or sponsored by OpenAI or the OpenAI Codex team.
+Palm Agents Relay is based on [Codex Relay](https://github.com/gronxb/codex-relay) and is an independent project.
 
 ## Requirements
 
 - Node.js 22.14 or newer
 - Codex CLI installed and signed in on the computer running the relay
-- The Codex Relay mobile app on the same network, Tailscale network, or another route that can reach your computer
+- The Palm Agents mobile app on the same network, Tailscale network, or another route that can reach your computer
 
 ## Start the Relay
 
 Run the server from the workspace you want Codex to use:
 
 ```sh
-npx codex-relay@latest
+npx @larry-labs/palm-agents-relay@latest
 ```
 
 The CLI prints a QR code, a mobile URL, and a `codex-relay://pair...` pairing payload. Scan the QR code from the mobile app. If the relay detects multiple possible network addresses, the QR includes them and the app automatically uses the first address it can reach. If scanning is not available, paste the full pairing payload into the app.
@@ -28,7 +28,7 @@ No second terminal is needed.
 For background relays or non-interactive output, use the approval command:
 
 ```sh
-npx codex-relay@latest approve XXXX-XXXX
+npx @larry-labs/palm-agents-relay@latest approve XXXX-XXXX
 ```
 
 After approval, the phone can list Codex threads, start new work, stream messages, and handle approval prompts from the local Codex runtime.
@@ -50,7 +50,7 @@ Linux, WSL, and native Windows keep using a private app-server by default. A ter
 Require the shared app-server on any platform:
 
 ```sh
-npx codex-relay@latest --shared-app-server
+npx @larry-labs/palm-agents-relay@latest --shared-app-server
 ```
 
 This explicit mode does not fall back to a private app-server when shared startup fails.
@@ -80,7 +80,7 @@ Shared mode requires a recent Codex CLI with app-server and `resume --remote` su
 To keep the relay running after the command returns:
 
 ```sh
-npx codex-relay@latest --bg
+npx @larry-labs/palm-agents-relay@latest --bg
 ```
 
 Background mode writes runtime files under `.codex-relay/` in the current directory:
@@ -93,55 +93,55 @@ Background mode writes runtime files under `.codex-relay/` in the current direct
 Print the current pairing QR again:
 
 ```sh
-npx codex-relay@latest qr
+npx @larry-labs/palm-agents-relay@latest qr
 ```
 
 Stop a background server:
 
 ```sh
-npx codex-relay@latest stop
+npx @larry-labs/palm-agents-relay@latest stop
 ```
 
 ## Commands
 
 ```sh
-npx codex-relay@latest
+npx @larry-labs/palm-agents-relay@latest
 ```
 
 Start the relay in the foreground.
 
 ```sh
-npx codex-relay@latest --bg
+npx @larry-labs/palm-agents-relay@latest --bg
 ```
 
 Start the relay in the background.
 
 ```sh
-npx codex-relay@latest stop
+npx @larry-labs/palm-agents-relay@latest stop
 ```
 
 Stop the background relay. Repeating this command is safe when no background server is running.
 
 ```sh
-npx codex-relay@latest --shared-app-server
+npx @larry-labs/palm-agents-relay@latest --shared-app-server
 ```
 
 Require the relay to start through Codex's shared app-server socket.
 
 ```sh
-npx codex-relay@latest qr
+npx @larry-labs/palm-agents-relay@latest qr
 ```
 
 Print the latest pairing QR for an already running relay.
 
 ```sh
-npx codex-relay@latest approve XXXX-XXXX
+npx @larry-labs/palm-agents-relay@latest approve XXXX-XXXX
 ```
 
 Approve a pending mobile pairing request.
 
 ```sh
-npx codex-relay@latest --dangerously-auto-approve
+npx @larry-labs/palm-agents-relay@latest --dangerously-auto-approve
 ```
 
 Start the relay and automatically approve mobile pairing requests. Use this only for controlled review or demo environments.
@@ -154,7 +154,7 @@ The relay listens on `0.0.0.0:8787` by default. Configure it with environment va
 | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `PORT`                                 | Server port. Defaults to `8787`.                                                                                                                                |
 | `HOST`                                 | Listen host. Defaults to `0.0.0.0`.                                                                                                                             |
-| `CODEX_RELAY_WORKSPACE_PATH`           | Workspace path Codex should use. Defaults to the directory where you run `npx codex-relay@latest`.                                                              |
+| `CODEX_RELAY_WORKSPACE_PATH`           | Workspace path Codex should use. Defaults to the directory where you run `npx @larry-labs/palm-agents-relay@latest`.                                            |
 | `CODEX_RELAY_AUTH_DB_PATH`             | Pairing and session database path. Defaults to `.codex-relay/auth.db`.                                                                                          |
 | `CODEX_RELAY_APPROVAL_SECRET`          | Secret used by the local approve command. Usually generated automatically.                                                                                      |
 | `CODEX_RELAY_DANGEROUSLY_AUTO_APPROVE` | Set to `1` to auto-approve mobile pairing requests. Prefer the CLI flag for local use.                                                                          |
@@ -165,11 +165,11 @@ The relay listens on `0.0.0.0:8787` by default. Configure it with environment va
 Examples:
 
 ```sh
-PORT=8788 npx codex-relay@latest
+PORT=8788 npx @larry-labs/palm-agents-relay@latest
 ```
 
 ```sh
-CODEX_RELAY_WORKSPACE_PATH=/path/to/project npx codex-relay@latest
+CODEX_RELAY_WORKSPACE_PATH=/path/to/project npx @larry-labs/palm-agents-relay@latest
 ```
 
 ## Network Notes
@@ -182,22 +182,22 @@ The phone must be able to reach one of the URLs printed by the relay.
 
 ## Troubleshooting
 
-If `npx codex-relay@latest qr` cannot find a server, start one first:
+If `npx @larry-labs/palm-agents-relay@latest qr` cannot find a server, start one first:
 
 ```sh
-npx codex-relay@latest
+npx @larry-labs/palm-agents-relay@latest
 ```
 
 If the relay says another process is using the local pairing database, use the existing server:
 
 ```sh
-npx codex-relay@latest qr
+npx @larry-labs/palm-agents-relay@latest qr
 ```
 
 Or stop the background process shown by the CLI:
 
 ```sh
-npx codex-relay@latest stop
+npx @larry-labs/palm-agents-relay@latest stop
 ```
 
 If the mobile app cannot connect, confirm that the phone can reach the printed `Mobile:` URL and that the chosen port is not blocked by a firewall.

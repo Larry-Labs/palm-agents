@@ -1,15 +1,15 @@
 {
-  "name": "codex-relay",
+  "name": "@larry-labs/palm-agents-relay",
   "version": "1.6.6",
-  "description": "Local Codex Relay CLI bridge for the Codex Relay mobile app.",
+  "description": "Local Codex Relay CLI bridge for the Palm Agents mobile app.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/gronxb/codex-relay.git",
+    "url": "git+https://github.com/Larry-Labs/palm-agents.git",
     "directory": "packages/codex-relay"
   },
   "bin": {
-    "codex-relay": "dist/cli.js"
+    "palm-agents-relay": "dist/cli.js"
   },
   "files": [
     "dist",

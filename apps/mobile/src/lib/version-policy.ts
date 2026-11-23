@@ -1,11 +1,12 @@
 import { t } from "../i18n";
+import { relayInstallCommand } from "../constants/brand";
 import type { VersionResponse } from "codex-relay/api-schema";
 
 // Kept in the OTA-delivered JS bundle so compatibility can move with app updates.
 export const relayCompatibilityPolicy = {
   packageVersion: "1.6.0",
 } as const;
-export const relayUpdateCommand = "npx codex-relay@latest";
+export const relayUpdateCommand = relayInstallCommand;
 
 export type RelayVersionCompatibility =
   | {
@@ -81,7 +82,7 @@ function compareRelayVersions(current: string, required: string) {
   if (currentSemver.major !== requiredSemver.major) {
     return {
       compatible: false,
-      reason: t("This app expects codex-relay {0}.x.", requiredSemver.major),
+      reason: t("This app expects a {0}.x relay.", requiredSemver.major),
     };
   }
 

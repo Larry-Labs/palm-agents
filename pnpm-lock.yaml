@@ -257,7 +257,7 @@ importers:
         specifier: ^2.1.1
         version: 2.1.1
       codex-relay:
-        specifier: workspace:*
+        specifier: workspace:@larry-labs/palm-agents-relay@*
         version: link:../../packages/codex-relay
       expo:
         specifier: 58.0.2

@@ -4,7 +4,7 @@ export function relayServiceCommand(cliArgs) {
     command: "pnpm",
     args: [
       "--filter",
-      "codex-relay",
+      "@larry-labs/palm-agents-relay",
       "exec",
       "tsx",
       ...(persistent ? ["watch"] : []),
