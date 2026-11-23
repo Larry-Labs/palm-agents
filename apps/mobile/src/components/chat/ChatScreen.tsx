@@ -32,7 +32,7 @@ import {
   type ScanningResult,
 } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
-import { useFocusEffect, useNavigation } from "expo-router";
+import { router, useFocusEffect, useNavigation } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -58,6 +58,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import type { PaneArrangementLayout } from "@/components/ui/pane-arrangement-layout";
 import { CopyableCommand } from "@/components/ui/copyable-command";
 import { AppToast } from "@/components/ui/toast";
+import { RelayAddressForm } from "./RelayAddressForm";
 import { Fonts, Spacing } from "@/constants/theme";
 import { activeThreadAfterRefresh } from "@/lib/active-thread-selection";
 import { consumeHydratedDefaultThread } from "@/lib/server-state-hydration";
@@ -165,7 +166,7 @@ import {
 import { ChatShell } from "./ChatShell";
 import type { ChatShellAction } from "./ChatShellHeader";
 import { ConnectionBanner } from "./ConnectionBanner";
-import { approvalCommand } from "./pairing-commands";
+import { approvalCommand, relayStartCommand } from "./pairing-commands";
 import { EXPANDED_DRAWER_BREAKPOINT, useIpadSplitLayout } from "./ipad-split-layout";
 import { WorkspacePreviewSurface } from "./WorkspacePreviewSurface";
 import type { WorkspaceMarkdownPreviewTarget } from "./workspace-preview/markdown-target";
@@ -188,11 +189,20 @@ const EMPTY_THREADS: ThreadSummary[] = [];
 
 type ChatScreenProps = {
   initialPairingUrl?: string | null;
+  manualAddressMode?: boolean;
+  onCloseManualPairing?: () => void;
   onPairingComplete?: () => void;
 };
 
-export function ChatScreen({ initialPairingUrl, onPairingComplete }: ChatScreenProps = {}) {
+export function ChatScreen({
+  initialPairingUrl,
+  manualAddressMode,
+  onCloseManualPairing,
+  onPairingComplete,
+}: ChatScreenProps = {}) {
   const isHandlingPairingLink = useRef(false);
+  const scannedAddressOverride = useRef<string | undefined>(undefined);
+  const manualPairingAbortRef = useRef<AbortController | undefined>(undefined);
   const lastHandledPairingUrl = useRef<string | undefined>(undefined);
   const { width } = useWindowDimensions();
   const { isSidebarVisible, toggleSidebar } = useIpadSplitLayout();
@@ -1231,7 +1241,15 @@ export function ChatScreen({ initialPairingUrl, onPairingComplete }: ChatScreenP
     return () => clearInterval(healthCheck);
   }, [connection, isRunning, keepConnectionIfSessionIsValid]);
 
-  async function openScanner() {
+  useEffect(() => () => manualPairingAbortRef.current?.abort(), []);
+
+  function closePairingStatus() {
+    manualPairingAbortRef.current?.abort();
+    setPastePairOpen(false);
+  }
+
+  async function openScanner(addressOverride?: string) {
+    scannedAddressOverride.current = addressOverride;
     if (!cameraPermission?.granted) {
       const permission = await requestCameraPermission();
       if (!permission.granted) {
@@ -1276,23 +1294,30 @@ export function ChatScreen({ initialPairingUrl, onPairingComplete }: ChatScreenP
   }
 
   const handlePairingLink = useCallback(
-    async (url: string | null) => {
+    async (url: string | null, addressOverride?: string) => {
       const pairingUrl = url?.trim();
       if (
         !pairingUrl?.startsWith("codex-relay://pair") ||
-        (pairingUrl === lastHandledPairingUrl.current && hasCodexRelaySession()) ||
-        isHandlingPairingLink.current
+        (!addressOverride &&
+          pairingUrl === lastHandledPairingUrl.current &&
+          hasCodexRelaySession()) ||
+        isHandlingPairingLink.current ||
+        isHandlingScanRef.current
       ) {
         return;
       }
 
       isHandlingPairingLink.current = true;
+      const abort = addressOverride ? new AbortController() : undefined;
+      manualPairingAbortRef.current = abort;
       setPastePairing(true);
       setPastePairOpen(true);
       setPasteApprovalCode(undefined);
       setPasteApprovalServerUrl(undefined);
       try {
         const pairing = await pairWithQrPayload(pairingUrl, {
+          addressOverride,
+          signal: abort?.signal,
           onApprovalCode(approvalCode, serverUrl) {
             setPasteApprovalCode(approvalCode);
             setPasteApprovalServerUrl(serverUrl);
@@ -1311,11 +1336,14 @@ export function ChatScreen({ initialPairingUrl, onPairingComplete }: ChatScreenP
         onPairingComplete?.();
       } catch (caught) {
         setPastePairOpen(false);
-        Alert.alert(
-          t("Pairing failed"),
-          caught instanceof Error ? caught.message : pairingFailureAlertMessage,
-        );
+        if (!abort?.signal.aborted) {
+          Alert.alert(
+            t("Pairing failed"),
+            caught instanceof Error ? caught.message : pairingFailureAlertMessage,
+          );
+        }
       } finally {
+        manualPairingAbortRef.current = undefined;
         isHandlingPairingLink.current = false;
         setPastePairing(false);
       }
@@ -1356,10 +1384,14 @@ export function ChatScreen({ initialPairingUrl, onPairingComplete }: ChatScreenP
 
   const handleScanPayload = useCallback(
     async (payload: unknown) => {
-      if (isHandlingScanRef.current) {
+      if (isHandlingScanRef.current || isHandlingPairingLink.current) {
         return;
       }
 
+      const addressOverride = scannedAddressOverride.current;
+      scannedAddressOverride.current = undefined;
+      const abort = addressOverride ? new AbortController() : undefined;
+      manualPairingAbortRef.current = abort;
       const scanPairingGeneration = scanPairingGenerationRef.current + 1;
       scanPairingGenerationRef.current = scanPairingGeneration;
       isHandlingScanRef.current = true;
@@ -1371,6 +1403,8 @@ export function ChatScreen({ initialPairingUrl, onPairingComplete }: ChatScreenP
       setPastePairOpen(true);
       try {
         const pairing = await pairWithQrPayload(payload, {
+          addressOverride,
+          signal: abort?.signal,
           onApprovalCode(approvalCode, serverUrl) {
             void presentScannedPairingApproval(scanPairingGeneration, approvalCode, serverUrl);
           },
@@ -1387,6 +1421,9 @@ export function ChatScreen({ initialPairingUrl, onPairingComplete }: ChatScreenP
         await closeScannerSurface();
         hapticSuccess();
         await refresh();
+        if (addressOverride) {
+          onPairingComplete?.();
+        }
       } catch (caught) {
         scanPairingGenerationRef.current += 1;
         await closeScannerSurface();
@@ -1397,14 +1434,23 @@ export function ChatScreen({ initialPairingUrl, onPairingComplete }: ChatScreenP
         setPasteApprovalServerUrl(undefined);
         const isInvalidPairingQr = isPairingQrPayloadError(caught);
         setScannerMessage(scannerPairingFailureMessage(caught));
-        Alert.alert(
-          isInvalidPairingQr ? t("Invalid QR code") : t("Pairing failed"),
-          isInvalidPairingQr ? invalidPairingQrAlertMessage : pairingFailureAlertMessage,
-        );
+        if (!abort?.signal.aborted) {
+          Alert.alert(
+            isInvalidPairingQr ? t("Invalid QR code") : t("Pairing failed"),
+            addressOverride && caught instanceof Error
+              ? caught.message
+              : isInvalidPairingQr
+                ? invalidPairingQrAlertMessage
+                : pairingFailureAlertMessage,
+          );
+        }
+      } finally {
+        manualPairingAbortRef.current = undefined;
       }
     },
     [
       closeScannerSurface,
+      onPairingComplete,
       presentScannedPairingApproval,
       queryClient,
       refresh,
@@ -2254,7 +2300,8 @@ export function ChatScreen({ initialPairingUrl, onPairingComplete }: ChatScreenP
             serverUrl={serverUrl}
             workspacePath={workspacePath}
             onRefresh={refresh}
-            onScanConnect={openScanner}
+            onScanConnect={() => void openScanner()}
+            onManualConnect={() => router.push({ pathname: "/pair", params: { mode: "manual" } })}
           />
         </Animated.View>
       }
@@ -2350,50 +2397,60 @@ export function ChatScreen({ initialPairingUrl, onPairingComplete }: ChatScreenP
 
   return (
     <>
-      <AdaptivePanes
-        primary={chatPane}
-        secondary={hasPairedSession ? workspacePreviewPane : null}
-        divider={
-          <GestureDetector gesture={previewResizeGesture}>
-            <Animated.View
-              accessibilityLabel={t("Resize workspace preview")}
-              style={styles.previewResizeHandle}
-            >
-              <View style={styles.previewResizeGrip} />
-            </Animated.View>
-          </GestureDetector>
-        }
-        secondaryPlaceholder={
-          hasPairedSession ? (
-            <EmptyState
-              icon="preview"
-              systemImage="sidebar.trailing"
-              title={t("Workspace preview hidden")}
-              description={t(
-                "This half of the screen shows the workspace preview while the device is half open.",
-              )}
-              action={{ label: t("Show preview"), onPress: toggleWorkspacePreview }}
-            />
-          ) : (
-            <EmptyState
-              icon="preview"
-              systemImage="sidebar.trailing"
-              title={t("Workspace preview")}
-              description={t(
-                "Pair this device with your computer to use the workspace preview here.",
-              )}
-            />
-          )
-        }
-        secondaryWidth={clampedPreviewPaneWidth}
-        dividerWidth={PREVIEW_RESIZE_HANDLE_WIDTH}
-        sideBySide={usesWideLayout}
-        previewShown={hasPairedSession && (!usesWideLayout || isWidePreviewVisible)}
-        selectedPane={activePagerPage}
-        onSelectPane={setActivePagerPage}
-        onLayout={onWideLayout}
-        onArrangementChange={onPaneArrangementChange}
-      />
+      {manualAddressMode && onCloseManualPairing ? (
+        <RelayAddressForm
+          mode="pair"
+          pairing={isPairing}
+          onBack={onCloseManualPairing}
+          onScan={(address) => void openScanner(address)}
+          onPairWithLink={(link, address) => void handlePairingLink(link, address)}
+        />
+      ) : (
+        <AdaptivePanes
+          primary={chatPane}
+          secondary={hasPairedSession ? workspacePreviewPane : null}
+          divider={
+            <GestureDetector gesture={previewResizeGesture}>
+              <Animated.View
+                accessibilityLabel={t("Resize workspace preview")}
+                style={styles.previewResizeHandle}
+              >
+                <View style={styles.previewResizeGrip} />
+              </Animated.View>
+            </GestureDetector>
+          }
+          secondaryPlaceholder={
+            hasPairedSession ? (
+              <EmptyState
+                icon="preview"
+                systemImage="sidebar.trailing"
+                title={t("Workspace preview hidden")}
+                description={t(
+                  "This half of the screen shows the workspace preview while the device is half open.",
+                )}
+                action={{ label: t("Show preview"), onPress: toggleWorkspacePreview }}
+              />
+            ) : (
+              <EmptyState
+                icon="preview"
+                systemImage="sidebar.trailing"
+                title={t("Workspace preview")}
+                description={t(
+                  "Pair this device with your computer to use the workspace preview here.",
+                )}
+              />
+            )
+          }
+          secondaryWidth={clampedPreviewPaneWidth}
+          dividerWidth={PREVIEW_RESIZE_HANDLE_WIDTH}
+          sideBySide={usesWideLayout}
+          previewShown={hasPairedSession && (!usesWideLayout || isWidePreviewVisible)}
+          selectedPane={activePagerPage}
+          onSelectPane={setActivePagerPage}
+          onLayout={onWideLayout}
+          onArrangementChange={onPaneArrangementChange}
+        />
+      )}
       {copyToast ? (
         <AppToast
           key={copyToast.id}
@@ -2408,7 +2465,7 @@ export function ChatScreen({ initialPairingUrl, onPairingComplete }: ChatScreenP
       ) : null}
       <Modal
         animationType="slide"
-        onRequestClose={() => setPastePairOpen(false)}
+        onRequestClose={closePairingStatus}
         presentationStyle="pageSheet"
         visible={isPastePairOpen}
       >
@@ -2421,7 +2478,7 @@ export function ChatScreen({ initialPairingUrl, onPairingComplete }: ChatScreenP
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t("Close pairing status")}
-                onPress={() => setPastePairOpen(false)}
+                onPress={closePairingStatus}
                 style={({ pressed }) => [styles.manualButtonSecondary, pressed && styles.pressed]}
               >
                 <ThemedText type="smallBold">{t("Close")}</ThemedText>
@@ -2436,7 +2493,7 @@ export function ChatScreen({ initialPairingUrl, onPairingComplete }: ChatScreenP
                   ? t(
                       "If the relay is running interactively, switch to that terminal, check that this code matches, then type y and press Enter at the approval prompt.",
                     )
-                  : t("Finding your computer on LAN or Tailscale...")}
+                  : t("Connecting to the relay...")}
               </ThemedText>
               {pasteApprovalCode ? (
                 <View style={styles.manualApproval}>
@@ -2817,15 +2874,16 @@ function errorMessage(error: unknown) {
 function scannerPairingFailureMessage(error: unknown) {
   return isPairingQrPayloadError(error)
     ? t("This is not the Codex Relay QR. Scan the QR shown on your computer.")
-    : t("Could not connect. Use the same Wi-Fi or turn on Tailscale, then scan again.");
+    : t("Could not connect. Check that your phone can reach the relay, then scan again.");
 }
 
 const invalidPairingQrAlertMessage = t(
-  "Run npx codex-relay@latest on your computer, then scan the QR shown there.",
+  "Run {0} on your computer, then scan the QR shown there.",
+  relayStartCommand,
 );
 
 const pairingFailureAlertMessage = t(
-  "Use the same Wi-Fi on your phone and computer. If that is not possible, turn on Tailscale on both devices and scan again.",
+  "Make sure the relay is running and your phone can reach the address in the pairing QR or link.",
 );
 
 async function safeAsyncValue<T>(callback: () => Promise<T>) {

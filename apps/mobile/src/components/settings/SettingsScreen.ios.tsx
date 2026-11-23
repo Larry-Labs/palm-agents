@@ -16,6 +16,8 @@ import {
   VStack,
 } from "@expo/ui/swift-ui";
 import {
+  accessibilityLabel,
+  buttonStyle,
   disabled,
   font,
   foregroundStyle,
@@ -25,6 +27,7 @@ import {
   scrollContentBackground,
   tint,
 } from "@expo/ui/swift-ui/modifiers";
+import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useTheme } from "@/hooks/use-theme";
@@ -33,7 +36,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import {
   appUpdateStatusSuffix,
   clampPercent,
-  compactServer,
   connectionLabel,
   rateLimitProgressColor,
   useRemoteConfigPanel,
@@ -42,12 +44,7 @@ import {
 } from "@/components/settings/use-settings-screen";
 import { ThemedText } from "@/components/themed-text";
 import { Icon } from "@/components/ui/icon";
-import {
-  codexRelayRepositoryLabel,
-  codexRelayRepositoryUrl,
-  codexRelaySponsorLabel,
-  codexRelaySponsorUrl,
-} from "@/constants/links";
+import { codexRelayRepositoryLabel, codexRelayRepositoryUrl } from "@/constants/links";
 import { MaxContentWidth } from "@/constants/theme";
 import { hotUpdater, hotUpdaterBaseUrl } from "@/lib/hot-updater";
 import { clearHotUpdaterLogs, formatHotUpdaterLogTime } from "@/lib/hot-updater-logs";
@@ -60,8 +57,10 @@ const monospaced = [font({ textStyle: "footnote", design: "monospaced" })];
 // Native SwiftUI Form; the hook owns every piece of state and every action.
 export function SettingsScreen() {
   const theme = useTheme();
+  const [showDiscoveredAddresses, setShowDiscoveredAddresses] = useState(false);
   const settings = useSettingsScreen();
   const {
+    addServerAddress,
     appUpdate,
     appUpdateActionLabel,
     appliedBundleSuffix,
@@ -69,9 +68,12 @@ export function SettingsScreen() {
     closeSettings,
     computerName,
     connection,
+    discoveredServerAddresses,
+    editServerAddress,
     hasPairedSession,
     isAppUpdateActionDisabled,
     isAppUpdatePending,
+    manualServerAddresses,
     openProjectLink,
     pushNotificationPreferences,
     pushNotificationsLoading,
@@ -83,11 +85,46 @@ export function SettingsScreen() {
     revealHotUpdaterLogs,
     selectServerAddress,
     serverUrl,
-    serverUrlCandidates,
     signOut,
     switchingServerUrl,
     updatePushNotificationPreference,
   } = settings;
+  function renderAddress(candidate: Parameters<typeof selectServerAddress>[0]) {
+    const switchButton = (
+      <Button
+        onPress={() => void selectServerAddress(candidate)}
+        modifiers={[buttonStyle("borderless"), disabled(Boolean(switchingServerUrl))]}
+      >
+        <HStack spacing={10}>
+          <VStack alignment="leading" spacing={2}>
+            <Text modifiers={[foregroundStyle("primary")]}>{candidate.label}</Text>
+            <Text modifiers={footnote}>{candidate.url}</Text>
+          </VStack>
+          <Spacer />
+          {switchingServerUrl === candidate.url ? (
+            <Text modifiers={footnote}>{t("Checking")}</Text>
+          ) : null}
+        </HStack>
+      </Button>
+    );
+    return (
+      <HStack key={candidate.url} spacing={12}>
+        {switchButton}
+        {candidate.manual ? (
+          <Button
+            label={t("Edit address")}
+            onPress={() => editServerAddress(candidate.url)}
+            modifiers={[
+              accessibilityLabel(t("Edit address {0}", candidate.url)),
+              buttonStyle("borderless"),
+              disabled(Boolean(switchingServerUrl)),
+            ]}
+          />
+        ) : null}
+      </HStack>
+    );
+  }
+
   const notificationsDisabled = pushNotificationsLoading || pushNotificationsUpdating;
   const updateSuffix = appUpdateStatusSuffix(appUpdate.status);
   const versionLine = [
@@ -118,49 +155,8 @@ export function SettingsScreen() {
         </View>
         <Host colorScheme={theme.isDark ? "dark" : "light"} style={styles.host}>
           <Form modifiers={[scrollContentBackground("hidden")]}>
-            <Section title={t("Project")} modifiers={[listRowBackground(theme.surface)]}>
-              <Button onPress={() => openProjectLink(codexRelayRepositoryUrl)}>
-                <LabeledContent
-                  label={
-                    <Label title="GitHub" systemImage="chevron.left.forwardslash.chevron.right" />
-                  }
-                >
-                  <Text modifiers={footnote}>{codexRelayRepositoryLabel}</Text>
-                </LabeledContent>
-              </Button>
-              <Button onPress={() => openProjectLink(codexRelaySponsorUrl)}>
-                <LabeledContent
-                  label={<Label title={t("Sponsor")} systemImage="heart.fill" color="#FF9FC0" />}
-                >
-                  <Text modifiers={footnote}>{codexRelaySponsorLabel}</Text>
-                </LabeledContent>
-              </Button>
-            </Section>
-
-            <Section title={t("Usage Limits")} modifiers={[listRowBackground(theme.surface)]}>
-              {rateLimitRows.length > 0 ? (
-                rateLimitRows.map((row) => (
-                  <RateLimitGauge
-                    key={row.id}
-                    label={row.label}
-                    remainingPercent={row.window.remainingPercent}
-                    remainingText={formatRateLimitRemaining(row.window)}
-                    usedPercent={row.window.usedPercent}
-                  />
-                ))
-              ) : (
-                <LabeledContent label={t("Rate limits")}>
-                  <Text modifiers={secondaryText}>
-                    {rateLimitsFetching
-                      ? t("Checking current usage")
-                      : t("Unavailable from this runtime")}
-                  </Text>
-                </LabeledContent>
-              )}
-            </Section>
-
             <Section
-              title={t("Connected Computer")}
+              title={t("Relay connection")}
               footer={
                 hasPairedSession ? undefined : (
                   <Text>
@@ -187,40 +183,62 @@ export function SettingsScreen() {
                 </HStack>
               </LabeledContent>
               {hasPairedSession ? (
-                <LabeledContent label={t("Server")}>
-                  <Text modifiers={[...monospaced, foregroundStyle("secondary")]}>
-                    {compactServer(serverUrl)}
+                <>
+                  <HStack spacing={12}>
+                    <VStack alignment="leading" spacing={2}>
+                      <Text>{t("Current connection address")}</Text>
+                      <Text modifiers={footnote}>{serverUrl}</Text>
+                    </VStack>
+                    <Spacer />
+                    <Button
+                      label={t("Edit address")}
+                      onPress={() => editServerAddress(serverUrl)}
+                      modifiers={[
+                        accessibilityLabel(t("Edit address {0}", serverUrl)),
+                        buttonStyle("borderless"),
+                        disabled(Boolean(switchingServerUrl)),
+                      ]}
+                    />
+                  </HStack>
+                  <Button
+                    label={t("Add connection address")}
+                    onPress={addServerAddress}
+                    modifiers={[disabled(Boolean(switchingServerUrl))]}
+                  />
+                  {manualServerAddresses.map(renderAddress)}
+                  {discoveredServerAddresses.length > 0 ? (
+                    <DisclosureGroup
+                      isExpanded={showDiscoveredAddresses}
+                      label={t("Other addresses")}
+                      onIsExpandedChange={setShowDiscoveredAddresses}
+                    >
+                      {discoveredServerAddresses.map(renderAddress)}
+                    </DisclosureGroup>
+                  ) : null}
+                </>
+              ) : null}
+            </Section>
+
+            <Section title={t("Usage Limits")} modifiers={[listRowBackground(theme.surface)]}>
+              {rateLimitRows.length > 0 ? (
+                rateLimitRows.map((row) => (
+                  <RateLimitGauge
+                    key={row.id}
+                    label={row.label}
+                    remainingPercent={row.window.remainingPercent}
+                    remainingText={formatRateLimitRemaining(row.window)}
+                    usedPercent={row.window.usedPercent}
+                  />
+                ))
+              ) : (
+                <LabeledContent label={t("Rate limits")}>
+                  <Text modifiers={secondaryText}>
+                    {rateLimitsFetching
+                      ? t("Checking current usage")
+                      : t("Unavailable from this runtime")}
                   </Text>
                 </LabeledContent>
-              ) : null}
-              {hasPairedSession
-                ? serverUrlCandidates.map((candidate) => {
-                    const isSelected = candidate.url === serverUrl;
-                    const isSwitching = switchingServerUrl === candidate.url;
-                    return (
-                      <Button
-                        key={candidate.url}
-                        onPress={() => void selectServerAddress(candidate)}
-                        modifiers={[disabled(isSelected || Boolean(switchingServerUrl))]}
-                      >
-                        <HStack spacing={10}>
-                          <VStack alignment="leading" spacing={2}>
-                            <Text modifiers={[foregroundStyle("primary")]}>{candidate.label}</Text>
-                            <Text modifiers={[...monospaced, foregroundStyle("secondary")]}>
-                              {compactServer(candidate.url)}
-                            </Text>
-                          </VStack>
-                          <Spacer />
-                          {isSwitching ? (
-                            <Text modifiers={footnote}>{t("Checking")}</Text>
-                          ) : isSelected ? (
-                            <Image systemName="checkmark" size={15} color="#93E1B6" />
-                          ) : null}
-                        </HStack>
-                      </Button>
-                    );
-                  })
-                : null}
+              )}
             </Section>
 
             {hasPairedSession ? (
@@ -313,6 +331,25 @@ export function SettingsScreen() {
                   onHide={() => settings.setShowHotUpdaterLogs(false)}
                 />
               ) : null}
+            </Section>
+
+            <Section title={t("Project")} modifiers={[listRowBackground(theme.surface)]}>
+              <Button onPress={() => openProjectLink(codexRelayRepositoryUrl)}>
+                <LabeledContent
+                  label={
+                    <Label title="GitHub" systemImage="chevron.left.forwardslash.chevron.right" />
+                  }
+                >
+                  <Text modifiers={footnote}>{codexRelayRepositoryLabel}</Text>
+                </LabeledContent>
+              </Button>
+              <Button onPress={() => openProjectLink(codexRelaySponsorUrl)}>
+                <LabeledContent
+                  label={<Label title={t("Sponsor")} systemImage="heart.fill" color="#FF9FC0" />}
+                >
+                  <Text modifiers={footnote}>{codexRelaySponsorLabel}</Text>
+                </LabeledContent>
+              </Button>
             </Section>
           </Form>
         </Host>

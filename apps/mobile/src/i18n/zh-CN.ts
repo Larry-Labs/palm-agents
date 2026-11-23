@@ -24,8 +24,8 @@ export const zhCN = {
   "Codex Relay server returned {0}": "Relay 服务器返回 {0}",
   "Complete {0}": "完成 {0}",
   "Connected · {0}": "已连接 · {0}",
-  "Could not reach any server URL from the pairing QR. Tried: {0}. Make sure this device is on the same network or Tailscale is connected.":
-    "无法访问配对二维码中的服务器。已尝试：{0}。请确认设备处于同一局域网或已连接 Tailscale。",
+  "Could not reach any relay address in the pairing QR. Tried: {0}. Check your phone's network connection.":
+    "无法访问配对二维码中的 Relay 地址。已尝试：{0}。请检查手机的网络连接。",
   "Could not reach {0}: {1}": "无法访问 {0}：{1}",
   "Create new chat in {0}": "在 {0} 中新建会话",
   "Edited {0} file{1}": "已编辑 {0} 个文件{1}",
@@ -139,7 +139,8 @@ export const zhCN = {
   "Chat title": "会话名称",
   Checking: "检查中",
   "Checking current usage": "正在查询用量",
-  "Choose Wi-Fi or Tailscale": "选择 Wi-Fi 或 Tailscale",
+  "Connect directly on the same local network. Across networks, pair using a relay address your phone can reach.":
+    "同一局域网内可直接连接。跨网络时，请使用手机能访问的 Relay 地址进行配对。",
   "Choose a clear title for this chat.": "为会话设置名称。",
   "Choose fewer or smaller images so the chat stays stable.": "请选择更少或更小的图片。",
   "Choose images from your library": "从相册选择图片",
@@ -177,11 +178,41 @@ export const zhCN = {
   "Commit current workspace changes and push this branch.": "提交当前改动并推送分支。",
   Completed: "已完成",
   Conflicted: "存在冲突",
-  "Connect to the Codex Relay server first": "请先连接电脑",
-  "Connect to your computer": "连接电脑",
+  "Connect to the Codex Relay server first": "请先连接 Relay",
+  "Pair with Relay": "配对 Relay",
   "Connected Computer": "已连接的电脑",
+  "Relay connection": "Relay 连接",
+  "Current connection address": "当前连接地址",
+  "Add connection address": "添加连接地址",
+  "Edit connection address": "修改连接地址",
+  "Edit address {0}": "修改地址 {0}",
+  "Edit address": "修改",
+  "Other addresses": "其他地址",
+  "Custom address": "手动添加的地址",
+  "Manual connection": "手动连接",
+  "Relay address": "Relay 地址",
+  "Enter the IP and port or domain your phone uses to reach the Relay.":
+    "输入手机能访问的 IP 和端口，或域名。",
+  "Enter a valid Relay IP address or domain.": "请输入有效的 Relay IP 地址或域名。",
+  "Test connection": "测试连接",
+  "Test and save": "测试并保存",
+  "Relay reachable. Scan its pairing QR or paste its pairing link, then approve in its terminal.":
+    "已连通。请扫码或粘贴 Relay 的配对链接，再到 Relay 终端确认授权。",
+  "No secure pairing was found. Pair with the relay first.":
+    "找不到可用的安全配对，请先配对 Relay。",
+  "Update the Relay to add an address using your existing pairing.":
+    "请先升级运行在设备上的 Relay，再用已有配对添加地址。",
+  "This address could not be verified for your paired Relay. Check the address and forwarding settings.":
+    "无法确认这个地址通向已配对的 Relay，请检查地址和转发设置。",
+  "The connection changed. Try again.": "当前连接已变化，请重试。",
+  "Pairing link": "配对链接",
+  "Paste pairing link": "粘贴配对链接",
+  "Verify pairing link": "继续配对",
+  "Paste the full pairing link shown in the Relay terminal.":
+    "请粘贴 Relay 终端显示的完整配对链接。",
+  "Pairing canceled.": "已取消配对。",
   "Connecting terminal": "正在连接终端",
-  "Connecting to your computer": "正在连接电脑",
+  "Connecting to your computer": "正在连接 Relay",
   "Consumes usage limits faster": "会消耗更多额度",
   "Context usage": "上下文用量",
   "Control modifier": "Control 修饰键",
@@ -195,12 +226,12 @@ export const zhCN = {
   "Copy failed": "复制失败",
   "Copy message Markdown": "复制消息 Markdown",
   "Copy relay start command": "复制启动命令",
-  "Could not connect. Use the same Wi-Fi or turn on Tailscale, then scan again.":
-    "无法连接。请连接同一 Wi-Fi 或开启 Tailscale 后重试。",
+  "Could not connect. Check that your phone can reach the relay, then scan again.":
+    "无法连接。请确认手机能访问 Relay 后重新扫码。",
   "Could not reach the selected server address.": "无法访问所选服务器地址。",
   "Could not reach the server URL from the pairing QR.": "无法访问二维码中的服务器地址。",
-  "Could not reach your computer. Check that the relay is running and both devices are on the same LAN or connected to Tailscale.":
-    "无法连接电脑。请确认 Relay 正在运行，且两台设备处于同一局域网或已连接 Tailscale。",
+  "Could not reach the relay. Check that it is running and its address is reachable from your phone.":
+    "无法连接 Relay。请确认 Relay 正在运行，且手机能访问它的地址。",
   "Could not read the selected image.": "无法读取所选图片。",
   "Could not start Tailscale Serve.": "无法启动 Tailscale Serve。",
   "Couldn’t rename chat": "重命名失败",
@@ -253,7 +284,7 @@ export const zhCN = {
   "File too large": "文件过大",
   Files: "文件",
   "Filter current folder": "搜索当前文件夹",
-  "Finding your computer on LAN or Tailscale...": "正在局域网或 Tailscale 中查找电脑…",
+  "Connecting to the relay...": "正在连接 Relay…",
   "Full access": "完全访问",
   "Generic alerts only. Chat content stays on your paired computer.":
     "仅发送状态提醒，聊天内容保留在配对电脑上。",
@@ -330,7 +361,7 @@ export const zhCN = {
   "No matching skills": "没有匹配的技能",
   "No models": "暂无可用模型",
   "No paired computer": "尚未配对电脑",
-  "No paired computer yet": "尚未配对电脑",
+  "No paired relay yet": "尚未配对",
   "No preview tabs": "暂无预览标签页",
   "No text patch available for this file.": "此文件没有可显示的文本差异。",
   "No update server is configured.": "尚未配置更新服务器。",
@@ -346,9 +377,7 @@ export const zhCN = {
   Open: "打开",
   "Open Codex Relay GitHub repository": "打开 Palm Agents 的 GitHub 仓库",
   "Open Settings": "打开设置",
-  "Open Tailscale on App Store": "在 App Store 中打开 Tailscale",
-  "Open Tailscale on the App Store": "在 App Store 中打开 Tailscale",
-  "Open Terminal on your computer and run:": "在电脑终端中运行：",
+  "Run this command on the device that will host the relay:": "在要运行 Relay 的设备上执行：",
   "Open a Markdown attachment from chat.": "打开聊天中的 Markdown 附件。",
   "Open a Markdown document from the chat attachment card.": "从聊天附件打开 Markdown 文档。",
   "Open a local browser preview.": "打开本地网页预览。",
@@ -370,7 +399,6 @@ export const zhCN = {
   "Pair this device from the main screen to choose a relay server.": "请返回主界面配对电脑。",
   "Pair this device with your computer to use the workspace preview here.":
     "配对电脑后即可预览工作区。",
-  "Pair this phone once": "配对手机与电脑",
   "Pair with your computer to continue.": "请先配对电脑。",
   Pairing: "正在配对",
   "Pairing QR code has an invalid server URL.": "配对二维码中的服务器地址无效。",
@@ -418,7 +446,7 @@ export const zhCN = {
   "Reconnect terminal session": "重连终端会话",
   "Reconnecting terminal": "正在重连终端",
   "Reconnecting to the existing terminal session": "正在恢复原有终端会话",
-  "Reconnecting to your computer": "正在重连电脑",
+  "Reconnecting to your computer": "正在重连 Relay",
   "Refresh chat": "刷新会话",
   "Refresh connection": "刷新连接",
   "Refresh projects": "刷新项目",
@@ -450,22 +478,20 @@ export const zhCN = {
   "Right arrow": "向右方向键",
   Run: "执行",
   "Run in workspace, ask after sandbox failures": "在工作区内运行，需要额外权限时询问",
-  "Run npx codex-relay@latest on your computer, then scan the QR shown there.":
-    "在电脑上运行 npx codex-relay@latest，然后扫描二维码。",
-  "Run one command on your computer, scan the QR code, then approve the phone in that same terminal.":
-    "在电脑上启动 Relay，扫描二维码后在终端中确认授权。",
+  "Run {0} on your computer, then scan the QR shown there.": "在电脑上运行 {0}，然后扫描二维码。",
   "Run without permission prompts": "无需确认即可执行操作",
-  "Same Wi-Fi is enough nearby. To use Codex Relay away from this Wi-Fi, install Tailscale on your computer and phone, sign in to the same account, and make sure both say Connected before scanning.":
-    "附近使用时连接同一 Wi-Fi 即可。远程使用时，请在电脑和手机上安装 Tailscale，登录同一账户，确认均已连接后再扫码。",
+  "Trouble connecting?": "连不上？",
+  "Hide connection help": "收起连接帮助",
+  "Make sure the relay is running. For remote access, you can use a VPN such as Tailscale, a tunnel, or a reverse proxy. Use a pairing QR or link with an address your phone can reach.":
+    "请确认 Relay 正在运行。跨网络时，可用 VPN（如 Tailscale）、隧道或反向代理。配对码或链接里的 Relay 地址需要能从手机访问。",
   Save: "保存",
   "Save chat name": "保存会话名称",
   "Save goal": "保存目标",
   Saving: "保存中",
   "Scan QR": "扫码连接",
-  "Scan and approve": "扫码并授权",
   "Scan connection QR": "扫描连接二维码",
-  "Scan the QR shown in Terminal. Approve in the running relay terminal when prompted, or use the command shown on your phone in a new terminal.":
-    "扫描终端中的二维码，按提示在终端确认授权，也可在新终端运行手机上显示的命令。",
+  "Scan the QR shown in the relay terminal, then follow the prompts to approve.":
+    "扫描 Relay 终端显示的二维码，按提示确认授权。",
   "Scan the pairing QR from the Codex Relay server.": "扫描 Relay 终端中的配对二维码。",
   Scope: "范围",
   "Scroll to latest message": "回到最新消息",
@@ -593,8 +619,8 @@ export const zhCN = {
   "Usage limited": "额度受限",
   "Usage limits": "使用额度",
   "Usage unavailable": "用量信息不可用",
-  "Use the same Wi-Fi on your phone and computer. If that is not possible, turn on Tailscale on both devices and scan again.":
-    "请让手机和电脑连接同一 Wi-Fi，或在两台设备上开启 Tailscale 后重试。",
+  "Make sure the relay is running and your phone can reach the address in the pairing QR or link.":
+    "请确认 Relay 正在运行，且手机能访问配对二维码或链接里的地址。",
   "Use the selected skill.": "使用所选技能。",
   Used: "已用",
   Version: "版本",

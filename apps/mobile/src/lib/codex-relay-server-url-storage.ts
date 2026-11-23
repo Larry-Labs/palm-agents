@@ -2,6 +2,7 @@ import { t } from "../i18n";
 import { createMMKV } from "react-native-mmkv";
 
 const defaultServerUrl = "http://localhost:8787";
+const manualServerUrlsStorageKey = "codex-relay.manual-server-urls";
 const serverUrlCandidatesStorageKey = "codex-relay.server-url-candidates";
 const serverUrlStorageKey = "codex-relay.server-url";
 
@@ -10,6 +11,7 @@ export const codexRelayStorage = createMMKV({ id: "codex-relay" });
 export type CodexRelayServerUrlCandidate = {
   label: string;
   url: string;
+  manual: boolean;
 };
 
 export const fallbackCodexRelayServerUrl =
@@ -20,10 +22,16 @@ export function getCodexRelayServerUrl() {
 }
 
 export function getCodexRelayServerUrlCandidates(): CodexRelayServerUrlCandidate[] {
-  return serverUrlCandidatesFromUrls([
+  const manual = new Set(readStoredUrls(manualServerUrlsStorageKey));
+  return dedupeServerUrls([
     getCodexRelayServerUrl(),
-    ...readStoredServerUrlCandidates(),
-  ]);
+    ...manual,
+    ...readStoredUrls(serverUrlCandidatesStorageKey),
+  ]).map((url) => ({
+    label: manual.has(url) ? t("Custom address") : serverUrlCandidateLabel(url),
+    url,
+    manual: manual.has(url),
+  }));
 }
 
 export function setCodexRelayServerUrl(url: string) {
@@ -35,10 +43,26 @@ export function setCodexRelayServerUrl(url: string) {
 export function clearCodexRelayServerUrlState() {
   codexRelayStorage.remove(serverUrlStorageKey);
   codexRelayStorage.remove(serverUrlCandidatesStorageKey);
+  clearManualCodexRelayAddresses();
+}
+
+export function clearManualCodexRelayAddresses() {
+  codexRelayStorage.remove(manualServerUrlsStorageKey);
 }
 
 export function saveCodexRelayServerUrlCandidates(urls: string[]) {
   codexRelayStorage.set(serverUrlCandidatesStorageKey, JSON.stringify(dedupeServerUrls(urls)));
+}
+
+export function saveManualCodexRelayAddress(url: string, replaces?: string) {
+  const previous = readStoredUrls(manualServerUrlsStorageKey);
+  const urls = [url, ...previous.filter((candidate) => candidate !== replaces)];
+  const discovered = readStoredUrls(serverUrlCandidatesStorageKey);
+  const currentUrl = getCodexRelayServerUrl();
+  saveCodexRelayServerUrlCandidates(
+    [currentUrl, ...discovered].filter((candidate) => candidate !== replaces),
+  );
+  codexRelayStorage.set(manualServerUrlsStorageKey, JSON.stringify(dedupeServerUrls(urls)));
 }
 
 export function normalizeServerUrl(url: string) {
@@ -92,8 +116,8 @@ export function isLocalIPv6Host(host: string) {
   );
 }
 
-function readStoredServerUrlCandidates() {
-  const stored = codexRelayStorage.getString(serverUrlCandidatesStorageKey);
+function readStoredUrls(key: string) {
+  const stored = codexRelayStorage.getString(key);
   if (!stored) {
     return [];
   }
@@ -106,13 +130,6 @@ function readStoredServerUrlCandidates() {
   } catch {
     return [];
   }
-}
-
-function serverUrlCandidatesFromUrls(urls: string[]): CodexRelayServerUrlCandidate[] {
-  return dedupeServerUrls(urls).map((url) => ({
-    label: serverUrlCandidateLabel(url),
-    url,
-  }));
 }
 
 function serverUrlCandidateLabel(url: string) {

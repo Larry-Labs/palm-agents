@@ -224,6 +224,7 @@ function TabLayout() {
               >
                 <Stack.Screen name="(drawer)" />
                 <Stack.Screen name="pair" />
+                <Stack.Screen name="relay-address" options={{ animation: "slide_from_right" }} />
                 <Stack.Screen
                   name="image-viewer"
                   options={{

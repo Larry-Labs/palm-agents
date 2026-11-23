@@ -2,15 +2,15 @@ import { t } from "../../i18n";
 import { useSelector } from "@legendapp/state/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Constants from "expo-constants";
-import { router } from "expo-router";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Alert, Linking } from "react-native";
 
 import {
+  checkPairedRelayAddress,
   getCodexRelayServerUrlCandidates,
   getPushNotificationSettings,
   registerPushNotifications,
-  refreshSession,
   setCodexRelayServerUrl,
   signOutCodexRelaySession,
   unregisterPushNotifications,
@@ -35,7 +35,6 @@ import { visibleRateLimitRows } from "@/lib/rate-limits";
 import {
   clearServerState,
   fetchRateLimitsState,
-  fetchStatusState,
   serverStateKeys,
   serverStateQueryFns,
   setStatusState,
@@ -87,6 +86,15 @@ export function useSettingsScreen() {
     getCodexRelayServerUrlCandidates(),
   );
   const [switchingServerUrl, setSwitchingServerUrl] = useState<string | undefined>();
+  const switchingAddress = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      setServerUrlCandidates(getCodexRelayServerUrlCandidates());
+    }, []),
+  );
+  const alternateAddresses = serverUrlCandidates.filter(({ url }) => url !== serverUrl);
+  const manualServerAddresses = alternateAddresses.filter(({ manual }) => manual);
+  const discoveredServerAddresses = alternateAddresses.filter(({ manual }) => !manual);
   const [appUpdate, setAppUpdate] = useState<AppUpdateState>({
     status: "checking",
     updateInfo: null,
@@ -262,33 +270,40 @@ export function useSettingsScreen() {
   }
 
   async function selectServerAddress(candidate: CodexRelayServerUrlCandidate) {
-    if (candidate.url === serverUrl || switchingServerUrl) {
+    if (candidate.url === serverUrl || switchingAddress.current) {
       return;
     }
 
     hapticSelection();
+    switchingAddress.current = true;
     setSwitchingServerUrl(candidate.url);
-    const normalizedServerUrl = setCodexRelayServerUrl(candidate.url);
-    setServerUrl(normalizedServerUrl);
-    setServerUrlCandidates(getCodexRelayServerUrlCandidates());
-    clearServerState(queryClient);
-    setConnection("checking");
 
     try {
-      await refreshSession().catch(() => false);
-      const [status] = await Promise.all([
-        fetchStatusState(queryClient),
-        fetchRateLimitsState(queryClient).catch(() => undefined),
-      ]);
+      const status = await checkPairedRelayAddress(candidate);
+      if (chatStore$.serverUrl.peek() !== serverUrl || !chatStore$.hasPairedSession.peek()) {
+        return;
+      }
+      const normalizedServerUrl = setCodexRelayServerUrl(candidate.url);
+      clearServerState(queryClient);
+      setServerUrl(normalizedServerUrl);
       setStatusState(queryClient, status);
       setConnection("connected");
+      void fetchRateLimitsState(queryClient).catch(() => undefined);
     } catch (caught) {
       const message = settingsErrorMessage(caught);
-      setConnection("offline", message);
       Alert.alert(t("Server unavailable"), message);
     } finally {
+      switchingAddress.current = false;
       setSwitchingServerUrl(undefined);
     }
+  }
+
+  function addServerAddress() {
+    router.push("/relay-address");
+  }
+
+  function editServerAddress(address: string) {
+    router.push({ pathname: "/relay-address", params: { edit: address } });
   }
 
   async function applyAppUpdate() {
@@ -330,6 +345,7 @@ export function useSettingsScreen() {
   }
 
   return {
+    addServerAddress,
     appUpdate,
     appUpdateActionLabel,
     appliedBundleSuffix,
@@ -337,10 +353,13 @@ export function useSettingsScreen() {
     closeSettings,
     computerName,
     connection,
+    discoveredServerAddresses,
+    editServerAddress,
     hasPairedSession,
     hotUpdaterLogs,
     isAppUpdateActionDisabled,
     isAppUpdatePending,
+    manualServerAddresses,
     openProjectLink,
     pushNotificationPreferences,
     pushNotificationsLoading,
@@ -352,7 +371,6 @@ export function useSettingsScreen() {
     revealHotUpdaterLogs,
     selectServerAddress,
     serverUrl,
-    serverUrlCandidates,
     setShowHotUpdaterLogs,
     showHotUpdaterLogs,
     signOut,

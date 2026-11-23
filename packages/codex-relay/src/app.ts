@@ -18,6 +18,9 @@ import {
   PushNotificationSettingsResponseSchema,
   QueuedThreadInputActionResponseSchema,
   RateLimitsResponseSchema,
+  RelayAddressVerificationRequestSchema,
+  RelayAddressVerificationResponseSchema,
+  relayAddressProof,
   RenameThreadRequestSchema,
   RenameThreadResponseSchema,
   RewindThreadRequestSchema,
@@ -108,9 +111,10 @@ import {
   type StatusEntry,
 } from "es-git";
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { execFile } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import {
   closeSync,
   existsSync,
@@ -514,6 +518,7 @@ export function createApp(options: AppOptions = {}) {
       !options.pairing ||
       c.req.method === "OPTIONS" ||
       c.req.path === apiPaths.version ||
+      (c.req.method === "POST" && c.req.path === apiPaths.relayAddressVerify) ||
       c.req.path.startsWith(`${apiPaths.imageAttachments}/`) ||
       c.req.path === apiPaths.sessionsClear ||
       c.req.path.startsWith(apiPaths.pair)
@@ -553,6 +558,46 @@ export function createApp(options: AppOptions = {}) {
     });
 
     return secureJson(c, options.pairing, secureSessionsByTokenHash, response);
+  });
+
+  app.post(apiPaths.relayAddressVerify, bodyLimit({ maxSize: 1024 }), async (c) => {
+    c.header("Cache-Control", "no-store");
+    const parsed = await parsePlainJson(c.req.raw, RelayAddressVerificationRequestSchema);
+    if (!parsed.success) {
+      return c.json(validationError(parsed.error), 400);
+    }
+
+    const { clientSessionId, challenge, proof } = parsed.data;
+    const requestOrigin = externalRequestOrigin(c.req.url, (name) => c.req.header(name));
+    const origin = URL.canParse(requestOrigin) ? new URL(requestOrigin).origin : undefined;
+    const session = await options.pairing?.sessions.getSecureSessionByClientId(clientSessionId);
+    const expectedProof =
+      session && origin
+        ? relayAddressProof(session.mobileToServerKey, "mobile", clientSessionId, origin, challenge)
+        : undefined;
+    if (
+      !session ||
+      !origin ||
+      !expectedProof ||
+      !timingSafeEqual(Buffer.from(proof, "hex"), Buffer.from(expectedProof, "hex"))
+    ) {
+      return c.json(
+        apiError("relay_address_mismatch", "The relay address could not be verified."),
+        403,
+      );
+    }
+
+    return c.json(
+      RelayAddressVerificationResponseSchema.parse({
+        proof: relayAddressProof(
+          session.serverToMobileKey,
+          "server",
+          clientSessionId,
+          origin,
+          challenge,
+        ),
+      }),
+    );
   });
 
   app.post(apiPaths.pair, async (c) => {

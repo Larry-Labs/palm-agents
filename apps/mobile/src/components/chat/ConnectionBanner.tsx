@@ -1,6 +1,7 @@
 import { useTheme } from "@/hooks/use-theme";
 import { t } from "../../i18n";
-import { Linking, Pressable, View } from "react-native";
+import { useState } from "react";
+import { Pressable, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LinearTransition } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -12,12 +13,11 @@ import { workspaceName } from "@/lib/workspace-name";
 
 import { relayStartCommand } from "./pairing-commands";
 
-const tailscaleAppStoreUrl = "https://apps.apple.com/us/app/tailscale/id1470499037";
-
 export function ConnectionBanner({
   connection,
   error,
   hasPairedSession,
+  onManualConnect,
   onRefresh,
   onScanConnect,
   serverUrl,
@@ -26,12 +26,14 @@ export function ConnectionBanner({
   connection: "checking" | "connected" | "offline";
   error?: string;
   hasPairedSession: boolean;
+  onManualConnect: () => void;
   onRefresh: () => void;
   onScanConnect: () => void;
   serverUrl: string;
   workspacePath?: string;
 }) {
   const theme = useTheme();
+  const [showConnectionHelp, setShowConnectionHelp] = useState(false);
   const isConnected = connection === "connected";
   const statusText = isConnected
     ? t("Connected · {0}", workspaceName(workspacePath) ?? compactServer(serverUrl))
@@ -91,7 +93,7 @@ export function ConnectionBanner({
             <View style={styles.pairStatusDot} />
             <View style={styles.pairCopy}>
               <ThemedText type="smallBold" style={styles.pairTitle}>
-                {t("Connect to your computer")}
+                {t("Pair with Relay")}
               </ThemedText>
               <ThemedText
                 type="small"
@@ -99,45 +101,24 @@ export function ConnectionBanner({
                 style={styles.pairSubtitle}
                 numberOfLines={2}
               >
-                {hasPairedSession ? statusText : t("No paired computer yet")}
+                {hasPairedSession ? statusText : t("No paired relay yet")}
               </ThemedText>
             </View>
-          </View>
-          <View style={styles.onboardingIntro}>
-            <ThemedText type="smallBold" style={styles.onboardingTitle}>
-              {t("Pair this phone once")}
-            </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary" style={styles.onboardingCopy}>
-              {t(
-                "Run one command on your computer, scan the QR code, then approve the phone in that same terminal.",
-              )}
-            </ThemedText>
           </View>
           <View style={styles.stepList}>
             <PairingStep
               icon="terminal"
               label="1"
               title={t("Start the relay")}
-              body={t("Open Terminal on your computer and run:")}
+              body={t("Run this command on the device that will host the relay:")}
               command={relayStartCommand}
             />
             <PairingStep
-              icon="workspace"
-              label="2"
-              title={t("Choose Wi-Fi or Tailscale")}
-              body={t(
-                "Same Wi-Fi is enough nearby. To use Codex Relay away from this Wi-Fi, install Tailscale on your computer and phone, sign in to the same account, and make sure both say Connected before scanning.",
-              )}
-              actionLabel={t("Open Tailscale on App Store")}
-              actionAccessibilityLabel={t("Open Tailscale on the App Store")}
-              onAction={() => void Linking.openURL(tailscaleAppStoreUrl)}
-            />
-            <PairingStep
               icon="check"
-              label="3"
-              title={t("Scan and approve")}
+              label="2"
+              title={t("Scan QR")}
               body={t(
-                "Scan the QR shown in Terminal. Approve in the running relay terminal when prompted, or use the command shown on your phone in a new terminal.",
+                "Scan the QR shown in the relay terminal, then follow the prompts to approve.",
               )}
             />
           </View>
@@ -156,6 +137,36 @@ export function ConnectionBanner({
                 {t("Scan QR")}
               </ThemedText>
             </Button>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onManualConnect}
+              style={({ pressed }) => [styles.refreshAction, pressed && styles.pressed]}
+            >
+              <ThemedText type="smallBold">{t("Manual connection")}</ThemedText>
+            </Pressable>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.stepBody}>
+              {t(
+                "Connect directly on the same local network. Across networks, pair using a relay address your phone can reach.",
+              )}
+            </ThemedText>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showConnectionHelp }}
+              hitSlop={6}
+              onPress={() => setShowConnectionHelp((visible) => !visible)}
+              style={({ pressed }) => [styles.connectionHelpButton, pressed && styles.pressed]}
+            >
+              <ThemedText type="smallBold" style={styles.stepBody}>
+                {t(showConnectionHelp ? "Hide connection help" : "Trouble connecting?")}
+              </ThemedText>
+            </Pressable>
+            {showConnectionHelp ? (
+              <ThemedText type="small" themeColor="textSecondary" style={styles.stepBody}>
+                {t(
+                  "Make sure the relay is running. For remote access, you can use a VPN such as Tailscale, a tunnel, or a reverse proxy. Use a pairing QR or link with an address your phone can reach.",
+                )}
+              </ThemedText>
+            ) : null}
             {hasPairedSession ? (
               <Pressable
                 accessibilityRole="button"
@@ -182,18 +193,12 @@ function PairingStep({
   command,
   icon,
   label,
-  actionAccessibilityLabel,
-  actionLabel,
-  onAction,
   title,
 }: {
-  actionAccessibilityLabel?: string;
-  actionLabel?: string;
   body: string;
   command?: string;
-  icon: "check" | "terminal" | "workspace";
+  icon: "check" | "terminal";
   label: string;
-  onAction?: () => void;
   title: string;
 }) {
   const theme = useTheme();
@@ -219,19 +224,6 @@ function PairingStep({
             command={command}
             copyAccessibilityLabel={t("Copy relay start command")}
           />
-        ) : null}
-        {actionLabel && onAction ? (
-          <Pressable
-            accessibilityRole="link"
-            accessibilityLabel={actionAccessibilityLabel ?? actionLabel}
-            onPress={onAction}
-            style={({ pressed }) => [styles.stepAction, pressed && styles.pressed]}
-          >
-            <ThemedText type="smallBold" style={styles.stepActionText}>
-              {actionLabel}
-            </ThemedText>
-            <Icon name="externalLink" size={13} tintColor={theme.text} />
-          </Pressable>
         ) : null}
       </View>
     </View>
@@ -324,17 +316,6 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 12,
     lineHeight: 16,
   },
-  onboardingIntro: {
-    gap: 4,
-  },
-  onboardingTitle: {
-    fontSize: 18,
-    lineHeight: 23,
-  },
-  onboardingCopy: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
   stepList: {
     gap: 10,
   },
@@ -378,26 +359,13 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 12,
     lineHeight: 16,
   },
-  stepAction: {
-    alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: theme.subtle,
-    borderColor: theme.border,
-    borderRadius: 7,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 6,
-    minHeight: 32,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-  },
-  stepActionText: {
-    color: theme.text,
-    fontSize: 12,
-    lineHeight: 16,
-  },
   pairActions: {
     gap: 8,
+  },
+  connectionHelpButton: {
+    alignSelf: "flex-start",
+    justifyContent: "center",
+    minHeight: 28,
   },
   pairButton: {
     flexDirection: "row",

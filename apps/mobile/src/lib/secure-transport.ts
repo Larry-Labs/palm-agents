@@ -2,13 +2,21 @@ import { t } from "../i18n";
 import "react-native-get-random-values";
 
 import { gcm } from "@noble/ciphers/aes.js";
-import { bytesToUtf8, randomBytes, utf8ToBytes } from "@noble/ciphers/utils.js";
+import {
+  bytesToHex,
+  bytesToUtf8,
+  equalBytes,
+  hexToBytes,
+  randomBytes,
+  utf8ToBytes,
+} from "@noble/ciphers/utils.js";
 import { ed25519, x25519 } from "@noble/curves/ed25519.js";
 import { hkdf } from "@noble/hashes/hkdf.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import {
   EncryptedPayloadSchema,
   PairEncryptedPayloadSchema,
+  relayAddressProof,
   type EncryptedPayload,
   type PairResponse,
 } from "codex-relay/api-schema";
@@ -57,6 +65,38 @@ export function createSecurePairingAttempt(input: {
 
 export function attachApprovalCode(attempt: SecurePairingAttempt, approvalCode: string) {
   attempt.approvalCode = approvalCode;
+}
+
+export function createRelayAddressChallenge(clientSessionId: string, origin: string) {
+  const session = readSecureSession();
+  if (!session) {
+    throw new Error(t("No secure pairing was found. Pair with the relay first."));
+  }
+
+  const challenge = bytesToHex(randomBytes(32));
+  return {
+    request: {
+      clientSessionId,
+      challenge,
+      proof: relayAddressProof(
+        session.mobileToServerKey,
+        "mobile",
+        clientSessionId,
+        origin,
+        challenge,
+      ),
+    },
+    verify(proof: string) {
+      const expected = relayAddressProof(
+        session.serverToMobileKey,
+        "server",
+        clientSessionId,
+        origin,
+        challenge,
+      );
+      return equalBytes(hexToBytes(expected), hexToBytes(proof));
+    },
+  };
 }
 
 export function completeSecurePairing(attempt: SecurePairingAttempt, response: PairResponse) {
