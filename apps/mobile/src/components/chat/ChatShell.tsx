@@ -7,20 +7,16 @@ import type {
   ThreadCollaborationMode,
   ThreadGoal,
 } from "codex-relay/api-schema";
-import { useCallback, useMemo, useState, type ReactNode } from "react";
-import { Keyboard, View } from "react-native";
-import {
-  KeyboardController,
-  KeyboardGestureArea,
-  KeyboardStickyView,
-} from "react-native-keyboard-controller";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { View } from "react-native";
+import { KeyboardGestureArea, KeyboardStickyView } from "react-native-keyboard-controller";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
 import type { QueuedComposerPrompt } from "@/state/chat-store";
 
-import { ChatComposer } from "./ChatComposer";
+import { ChatComposer, type ChatComposerHandle } from "./ChatComposer";
 import { ChatShellHeader, type ChatShellAction } from "./ChatShellHeader";
 import { chatShellStyles as styles } from "./chat-shell-styles";
 import { implementablePlanId, MessageTimeline } from "./MessageTimeline";
@@ -122,6 +118,7 @@ export function ChatShell({
   workspacePath?: string;
 }) {
   const insets = useSafeAreaInsets();
+  const composerRef = useRef<ChatComposerHandle>(null);
   const [isKeyboardLayoutFrozen, setKeyboardLayoutFrozen] = useState(false);
   const [queuedPromptPanelHeight, setQueuedPromptPanelHeight] = useState(0);
   const {
@@ -136,10 +133,8 @@ export function ChatShell({
   const handleQueuedPromptPanelHeightChange = useCallback((height: number) => {
     setQueuedPromptPanelHeight((current) => (Math.abs(current - height) < 1 ? current : height));
   }, []);
-  const handleTimelineKeyboardDismissRequest = useCallback(() => {
-    setKeyboardLayoutFrozen(false);
-    Keyboard.dismiss();
-    void KeyboardController.dismiss().catch(() => undefined);
+  const dismissComposerKeyboard = useCallback(() => {
+    composerRef.current?.dismissKeyboard();
   }, []);
 
   return (
@@ -152,16 +147,18 @@ export function ChatShell({
         ]}
       >
         <View style={styles.shell}>
-          <ChatShellHeader
-            leadingAction={leadingAction}
-            subtitle={subtitle}
-            title={title}
-            trailingActions={trailingActions}
-          />
+          <View onTouchStart={dismissComposerKeyboard}>
+            <ChatShellHeader
+              leadingAction={leadingAction}
+              subtitle={subtitle}
+              title={title}
+              trailingActions={trailingActions}
+            />
 
-          <PlanProgressBanner progress={planProgress} subagents={planSubagents} />
+            <PlanProgressBanner progress={planProgress} subagents={planSubagents} />
 
-          {banner}
+            {banner}
+          </View>
 
           <KeyboardGestureArea
             interpolator="ios"
@@ -177,7 +174,7 @@ export function ChatShell({
                 onMessageCopied={onMessageCopied}
                 onMessageRewind={onMessageRewind}
                 onOpenMarkdownAttachment={onOpenMarkdownAttachment}
-                onKeyboardDismissRequest={handleTimelineKeyboardDismissRequest}
+                onKeyboardDismissRequest={dismissComposerKeyboard}
                 bottomAccessoryHeight={queuedPromptPanelHeight}
                 threadId={threadId}
               />
@@ -185,6 +182,7 @@ export function ChatShell({
 
             <KeyboardStickyView style={styles.composerDock}>
               <ChatComposer
+                ref={composerRef}
                 collaborationMode={collaborationMode}
                 composerThreadId={threadId}
                 contextWindowUsage={contextWindowUsage}

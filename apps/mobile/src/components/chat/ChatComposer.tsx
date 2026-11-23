@@ -17,6 +17,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useMemo,
   useReducer,
   useRef,
@@ -25,6 +26,7 @@ import {
   type Ref,
 } from "react";
 import {
+  Keyboard,
   Pressable,
   TextInput,
   View,
@@ -229,6 +231,10 @@ function initialInputRequestDraft(requestId: string | undefined) {
   };
 }
 
+export type ChatComposerHandle = {
+  dismissKeyboard: () => void;
+};
+
 export const ChatComposer = memo(function ChatComposer({
   contextWindowUsage,
   disabled,
@@ -264,6 +270,7 @@ export const ChatComposer = memo(function ChatComposer({
   onSaveGoal,
   onToggleGoalPause,
   rateLimitBuckets,
+  ref,
   skills,
   skillsLoadState,
   workspacePath,
@@ -302,6 +309,7 @@ export const ChatComposer = memo(function ChatComposer({
   onSaveGoal?: (objective: string) => void;
   onToggleGoalPause?: () => void;
   rateLimitBuckets: RateLimitBucket[];
+  ref?: Ref<ChatComposerHandle>;
   skills: AgentSkill[];
   skillsLoadState: "idle" | "loading" | "loaded" | "failed";
   workspacePath?: string;
@@ -337,6 +345,7 @@ export const ChatComposer = memo(function ChatComposer({
   const isInputRequestFreeformSelected = inputRequestDraft.freeformSelected;
   const selectedInputOption = inputRequestDraft.selectedOption;
   const inputRef = useRef<EnrichedMarkdownTextInputInstance | null>(null);
+  const keyboardDismissedRef = useRef(false);
   const isInputFocusedRef = useRef(false);
   const lastInputFocusAtRef = useRef(0);
   const previousFocusRecoveryKeyRef = useRef(focusRecoveryKey);
@@ -434,7 +443,7 @@ export const ChatComposer = memo(function ChatComposer({
       return;
     }
     previousFocusRecoveryKeyRef.current = focusRecoveryKey;
-    if (focusRecoveryKey === undefined || !isInputEditable) {
+    if (focusRecoveryKey === undefined || !isInputEditable || keyboardDismissedRef.current) {
       return;
     }
 
@@ -444,7 +453,9 @@ export const ChatComposer = memo(function ChatComposer({
     }
 
     requestAnimationFrame(() => {
-      inputRef.current?.focus();
+      if (!keyboardDismissedRef.current) {
+        inputRef.current?.focus();
+      }
     });
     if (focusRecoveryTimeoutRef.current) {
       clearTimeout(focusRecoveryTimeoutRef.current);
@@ -454,6 +465,26 @@ export const ChatComposer = memo(function ChatComposer({
       inputRef.current?.focus();
     }, 220);
   }, [focusRecoveryKey, isInputEditable, isKeyboardVisible]);
+
+  const blurComposerInput = useCallback(() => {
+    keyboardDismissedRef.current = true;
+    if (focusRecoveryTimeoutRef.current) {
+      clearTimeout(focusRecoveryTimeoutRef.current);
+      focusRecoveryTimeoutRef.current = undefined;
+    }
+    inputRef.current?.blur();
+  }, []);
+
+  const dismissComposerKeyboard = useCallback(() => {
+    blurComposerInput();
+    onKeyboardLayoutFrozenChange?.(false);
+    Keyboard.dismiss();
+    void KeyboardController.dismiss().catch(() => undefined);
+  }, [blurComposerInput, onKeyboardLayoutFrozenChange]);
+
+  useImperativeHandle(ref, () => ({ dismissKeyboard: dismissComposerKeyboard }), [
+    dismissComposerKeyboard,
+  ]);
 
   useEffect(() => {
     const shouldRestoreSkillMentions =
@@ -507,12 +538,6 @@ export const ChatComposer = memo(function ChatComposer({
     onKeyboardLayoutFrozenChange?.(false);
   }
 
-  function dismissComposerKeyboard() {
-    inputRef.current?.blur();
-    onKeyboardLayoutFrozenChange?.(false);
-    void KeyboardController.dismiss().catch(() => undefined);
-  }
-
   function handleSendPress() {
     dismissComposerKeyboard();
     onSend();
@@ -521,7 +546,7 @@ export const ChatComposer = memo(function ChatComposer({
   async function openAddSheet() {
     hapticSelection();
     onKeyboardLayoutFrozenChange?.(true);
-    inputRef.current?.blur();
+    blurComposerInput();
     await dismissKeyboardForSheet();
     setAddSheetOpen(true);
   }
@@ -1031,6 +1056,7 @@ export const ChatComposer = memo(function ChatComposer({
           onChangeSelection={handleInputSelectionChange}
           onChangeText={handleInputTextChange}
           onFocus={() => {
+            keyboardDismissedRef.current = false;
             isInputFocusedRef.current = true;
             lastInputFocusAtRef.current = Date.now();
           }}
