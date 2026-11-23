@@ -31,6 +31,9 @@ const mobileToServerKeyStorageKey = "mobile-to-server-key";
 const serverToMobileKeyStorageKey = "server-to-mobile-key";
 const nextMobileCounterStorageKey = "next-mobile-counter";
 const lastServerCounterStorageKey = "last-server-counter";
+const serverReceiveWindowStorageKey = "server-receive-window";
+const serverReceiveWindowSize = 1024;
+const serverReceiveWindowMask = (1n << BigInt(serverReceiveWindowSize)) - 1n;
 
 export type SecurePairingAttempt = {
   approvalCode?: string;
@@ -44,6 +47,7 @@ export type SecurePairingAttempt = {
 type SecureSession = {
   keyEpoch: number;
   lastServerCounter: number;
+  seenServerCounters: bigint;
   mobileToServerKey: Uint8Array;
   nextMobileCounter: number;
   serverToMobileKey: Uint8Array;
@@ -167,7 +171,15 @@ export function decryptResponsePayload(payload: unknown) {
   if (
     envelope.data.sender !== "server" ||
     envelope.data.keyEpoch !== session.keyEpoch ||
-    envelope.data.counter <= session.lastServerCounter
+    envelope.data.counter === 0
+  ) {
+    throw new Error(t("Server returned an invalid encrypted payload."));
+  }
+
+  const offset = session.lastServerCounter - envelope.data.counter;
+  if (
+    offset >= serverReceiveWindowSize ||
+    (offset >= 0 && (session.seenServerCounters & (1n << BigInt(offset))) !== 0n)
   ) {
     throw new Error(t("Server returned an invalid encrypted payload."));
   }
@@ -178,9 +190,19 @@ export function decryptResponsePayload(payload: unknown) {
     envelope.data.counter,
     envelope.data.ciphertext,
   );
-  session.lastServerCounter = envelope.data.counter;
+  const result: unknown = JSON.parse(decrypted);
+  if (offset < 0) {
+    // Independent requests and streams can deliver authenticated responses out of order.
+    session.seenServerCounters =
+      -offset >= serverReceiveWindowSize
+        ? 1n
+        : ((session.seenServerCounters << BigInt(-offset)) | 1n) & serverReceiveWindowMask;
+    session.lastServerCounter = envelope.data.counter;
+  } else {
+    session.seenServerCounters |= 1n << BigInt(offset);
+  }
   saveSecureSession(session);
-  return JSON.parse(decrypted);
+  return result;
 }
 
 export function clearSecureSession() {
@@ -197,6 +219,7 @@ function deriveSession(
   return {
     keyEpoch,
     lastServerCounter: 0,
+    seenServerCounters: 0n,
     mobileToServerKey: hkdf(
       sha256,
       sharedSecret,
@@ -279,7 +302,12 @@ function saveSecureSession(session: SecureSession) {
   storage.set(mobileToServerKeyStorageKey, bytesToBase64(session.mobileToServerKey));
   storage.set(serverToMobileKeyStorageKey, bytesToBase64(session.serverToMobileKey));
   storage.set(nextMobileCounterStorageKey, session.nextMobileCounter);
+  // Keep the legacy high-water mark so downgrading still rejects old responses.
   storage.set(lastServerCounterStorageKey, session.lastServerCounter);
+  storage.set(
+    serverReceiveWindowStorageKey,
+    `${session.lastServerCounter}:${session.seenServerCounters.toString(16)}`,
+  );
 }
 
 function readSecureSession() {
@@ -290,9 +318,17 @@ function readSecureSession() {
     return undefined;
   }
 
+  const lastServerCounter = storage.getNumber(lastServerCounterStorageKey) ?? 0;
+  const [storedCounter, seen] = (storage.getString(serverReceiveWindowStorageKey) ?? "").split(":");
+  // Older builds persisted no record of gaps. Treat their entire window as already received.
+  const seenServerCounters =
+    storedCounter === String(lastServerCounter) && seen && /^[0-9a-f]{1,256}$/.test(seen)
+      ? BigInt(`0x${seen}`)
+      : serverReceiveWindowMask;
   return {
     keyEpoch,
-    lastServerCounter: storage.getNumber(lastServerCounterStorageKey) ?? 0,
+    lastServerCounter,
+    seenServerCounters,
     mobileToServerKey: base64ToBytes(mobileToServerKey),
     nextMobileCounter: storage.getNumber(nextMobileCounterStorageKey) ?? 0,
     serverToMobileKey: base64ToBytes(serverToMobileKey),
