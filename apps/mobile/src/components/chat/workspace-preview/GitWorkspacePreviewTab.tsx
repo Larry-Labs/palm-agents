@@ -29,6 +29,7 @@ import { hapticSelection } from "@/lib/haptics";
 import { workspaceName } from "@/lib/workspace-name";
 
 import { HighlightedCodeBlock } from "../MessageBubble";
+import { CodeWrapToggle } from "../code-wrap-toggle";
 
 type PendingAction = "checkout" | "commit-push" | "pr" | null;
 type PublishConfirmation = "commit-push" | "pr" | null;
@@ -61,6 +62,7 @@ export const GitWorkspacePreviewTab = memo(function GitWorkspacePreviewTab({
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [publishConfirmation, setPublishConfirmation] = useState<PublishConfirmation>(null);
   const isInitialLoading = !workspaceChanges && isLoadingChanges && !workspaceChangesError;
+  const isActionDisabled = isRunning || pendingAction !== null;
 
   async function refreshFromPull() {
     hapticSelection();
@@ -100,6 +102,29 @@ export const GitWorkspacePreviewTab = memo(function GitWorkspacePreviewTab({
     });
   }
 
+  const branchSwitcher =
+    workspaceChanges && workspaceChanges.branches.length > 0 ? (
+      <BranchSwitcher
+        branches={workspaceChanges.branches}
+        currentBranch={workspaceChanges.currentBranch}
+        disabled={isActionDisabled}
+        workspaceName={workspaceDisplayName(workspaceChanges.workspacePath)}
+        onCheckoutBranch={(branch) =>
+          runDiffAction("checkout", async () => {
+            await onCheckoutBranch(branch);
+          })
+        }
+      />
+    ) : null;
+  const publishActions = workspaceChanges ? (
+    <PublishActions
+      disabled={isActionDisabled}
+      pendingAction={pendingAction}
+      onCommitPush={() => setPublishConfirmation("commit-push")}
+      onCreatePullRequest={() => setPublishConfirmation("pr")}
+    />
+  ) : null;
+
   return (
     <>
       <ScrollView
@@ -137,18 +162,7 @@ export const GitWorkspacePreviewTab = memo(function GitWorkspacePreviewTab({
             layout={gitPreviewLayoutTransition}
             style={styles.diffStack}
           >
-            <DiffActions
-              isRunning={isRunning}
-              changes={workspaceChanges}
-              pendingAction={pendingAction}
-              onCheckoutBranch={(branch) =>
-                runDiffAction("checkout", async () => {
-                  await onCheckoutBranch(branch);
-                })
-              }
-              onCommitPush={() => setPublishConfirmation("commit-push")}
-              onCreatePullRequest={() => setPublishConfirmation("pr")}
-            />
+            {branchSwitcher}
             <DiffSummary changes={workspaceChanges} />
             {workspaceChanges.files.length > 0 ? (
               <DiffFilesPreview files={workspaceChanges.files} />
@@ -176,6 +190,7 @@ export const GitWorkspacePreviewTab = memo(function GitWorkspacePreviewTab({
                 </ThemedText>
               </Animated.View>
             )}
+            {publishActions}
           </Animated.View>
         ) : (
           <Animated.View
@@ -185,21 +200,9 @@ export const GitWorkspacePreviewTab = memo(function GitWorkspacePreviewTab({
             layout={gitPreviewLayoutTransition}
             style={styles.diffStack}
           >
-            {workspaceChanges ? (
-              <DiffActions
-                isRunning={isRunning}
-                changes={workspaceChanges}
-                pendingAction={pendingAction}
-                onCheckoutBranch={(branch) =>
-                  runDiffAction("checkout", async () => {
-                    await onCheckoutBranch(branch);
-                  })
-                }
-                onCommitPush={() => setPublishConfirmation("commit-push")}
-                onCreatePullRequest={() => setPublishConfirmation("pr")}
-              />
-            ) : null}
+            {branchSwitcher}
             {isInitialLoading ? <LoadingGitIndicator /> : <EmptyChangesCard />}
+            {publishActions}
           </Animated.View>
         )}
       </ScrollView>
@@ -281,60 +284,35 @@ function publishConfirmationActionSubtitle(action: NonNullable<PublishConfirmati
     : t("Create a draft pull request from current workspace changes.");
 }
 
-function DiffActions({
-  changes,
-  isRunning,
+function PublishActions({
+  disabled,
   pendingAction,
-  onCheckoutBranch,
   onCommitPush,
   onCreatePullRequest,
 }: {
-  changes: WorkspaceChangesResponse;
-  isRunning: boolean;
+  disabled: boolean;
   pendingAction: PendingAction;
-  onCheckoutBranch: (branch: string) => void;
   onCommitPush: () => void;
   onCreatePullRequest: () => void;
 }) {
-  const currentBranch = changes.currentBranch;
-  const changedFileCount = visibleChangedFileCount(changes);
-  const isActionDisabled = isRunning || pendingAction !== null;
-
   return (
     <Animated.View layout={gitPreviewLayoutTransition} style={styles.actionsPanel}>
-      {changes.branches.length > 0 ? (
-        <BranchSwitcher
-          branches={changes.branches}
-          currentBranch={currentBranch}
-          disabled={isActionDisabled}
-          workspaceName={workspaceDisplayName(changes.workspacePath)}
-          onCheckoutBranch={onCheckoutBranch}
+      <ThemedText type="smallBold" style={styles.sectionTitle}>
+        {t("Publish")}
+      </ThemedText>
+      <Animated.View layout={gitPreviewFastLayoutTransition} style={styles.publishButtonRow}>
+        <DiffActionButton
+          disabled={disabled}
+          iconName="upload"
+          label={pendingAction === "commit-push" ? t("Starting") : t("Commit & Push")}
+          onPress={onCommitPush}
         />
-      ) : null}
-      <Animated.View layout={gitPreviewFastLayoutTransition} style={styles.actionSection}>
-        <Animated.View layout={gitPreviewFastLayoutTransition} style={styles.sectionHeader}>
-          <ThemedText type="smallBold" style={styles.sectionTitle}>
-            {t("Publish")}
-          </ThemedText>
-          <ThemedText type="code" themeColor="textSecondary" style={styles.sectionMeta}>
-            {changedFileCount} {t("files, +")}
-            {changes.stats.additions} -{changes.stats.deletions}
-          </ThemedText>
-        </Animated.View>
-        <Animated.View layout={gitPreviewFastLayoutTransition} style={styles.publishButtonRow}>
-          <DiffActionButton
-            disabled={isActionDisabled}
-            iconName="upload"
-            label={pendingAction === "commit-push" ? t("Starting") : t("Commit & Push")}
-            onPress={onCommitPush}
-          />
-          <DiffActionButton
-            disabled={isActionDisabled}
-            iconName="pullRequest"
-            label={pendingAction === "pr" ? t("Starting PR") : t("Create PR")}
-            onPress={onCreatePullRequest}
-          />
-        </Animated.View>
+        <DiffActionButton
+          disabled={disabled}
+          iconName="pullRequest"
+          label={pendingAction === "pr" ? t("Starting PR") : t("Create PR")}
+          onPress={onCreatePullRequest}
+        />
       </Animated.View>
     </Animated.View>
   );
@@ -568,12 +546,8 @@ function DiffSummary({ changes }: { changes: WorkspaceChangesResponse }) {
         {changedFileCount} {t("files changed")}
       </ThemedText>
       <View style={styles.summaryStats}>
-        <ThemedText type="code" style={styles.additions}>
-          +{changes.stats.additions}
-        </ThemedText>
-        <ThemedText type="code" style={styles.deletions}>
-          -{changes.stats.deletions}
-        </ThemedText>
+        <UiText style={styles.additions}>+{changes.stats.additions}</UiText>
+        <UiText style={styles.deletions}>-{changes.stats.deletions}</UiText>
       </View>
     </Animated.View>
   );
@@ -611,6 +585,8 @@ function DiffFilesPreview({ files }: { files: WorkspaceChangeFile[] }) {
 }
 
 function DiffFileCard({ file }: { file: WorkspaceChangeFile }) {
+  const [wrapped, setWrapped] = useState(false);
+
   return (
     <Animated.View
       entering={gitPreviewEnterTransition}
@@ -636,9 +612,12 @@ function DiffFileCard({ file }: { file: WorkspaceChangeFile }) {
               : file.path}
           </ThemedText>
         </View>
+        {file.patch ? (
+          <CodeWrapToggle wrapped={wrapped} onToggle={() => setWrapped((value) => !value)} />
+        ) : null}
       </View>
       {file.patch ? (
-        <DiffPatchBlock patch={file.patch} />
+        <DiffPatchBlock patch={file.patch} wrapped={wrapped} />
       ) : (
         <View style={styles.noPatch}>
           <ThemedText
@@ -655,7 +634,7 @@ function DiffFileCard({ file }: { file: WorkspaceChangeFile }) {
   );
 }
 
-function DiffPatchBlock({ patch }: { patch: string }) {
+function DiffPatchBlock({ patch, wrapped }: { patch: string; wrapped: boolean }) {
   const { hiddenLineCount, lines } = useMemo(() => {
     const occurrences = new Map<string, number>();
     const patchLines = patch.split("\n");
@@ -668,40 +647,50 @@ function DiffPatchBlock({ patch }: { patch: string }) {
     return { hiddenLineCount: patchLines.length - visiblePatchLines.length, lines };
   }, [patch]);
 
+  const patchLines = (
+    <View style={styles.patchLines}>
+      {lines.map((line) => (
+        <UiText key={line.id} selectable style={[styles.patchLine, patchLineStyle(line.text)]}>
+          {line.text || " "}
+        </UiText>
+      ))}
+      {hiddenLineCount > 0 ? (
+        <UiText selectable style={[styles.patchLine, styles.patchLineMeta]}>
+          ... {hiddenLineCount} {t("more diff lines")}
+        </UiText>
+      ) : null}
+    </View>
+  );
+
   return (
-    <ScrollView
-      horizontal
-      nestedScrollEnabled
-      showsHorizontalScrollIndicator
-      style={styles.patchScroller}
-    >
-      <View style={styles.patchLines}>
-        {lines.map((line) => (
-          <UiText key={line.id} selectable style={[styles.patchLine, patchLineStyle(line.text)]}>
-            {line.text || " "}
-          </UiText>
-        ))}
-        {hiddenLineCount > 0 ? (
-          <UiText selectable style={[styles.patchLine, styles.patchLineMeta]}>
-            ... {hiddenLineCount} {t("more diff lines")}
-          </UiText>
-        ) : null}
-      </View>
-    </ScrollView>
+    <View style={styles.patchSurface}>
+      {wrapped ? (
+        patchLines
+      ) : (
+        <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator>
+          {patchLines}
+        </ScrollView>
+      )}
+    </View>
   );
 }
 
 function patchLineStyle(line: string) {
-  if (line.startsWith("+") && !line.startsWith("+++")) {
+  if (line.startsWith("+") && !line.startsWith("+++ ")) {
     return styles.patchLineAdded;
   }
-  if (line.startsWith("-") && !line.startsWith("---")) {
+  if (line.startsWith("-") && !line.startsWith("--- ")) {
     return styles.patchLineDeleted;
   }
   if (line.startsWith("@@")) {
     return styles.patchLineHunk;
   }
-  if (line.startsWith("diff --git") || line.startsWith("---") || line.startsWith("+++")) {
+  if (
+    line.startsWith("diff --git") ||
+    line.startsWith("index ") ||
+    line.startsWith("--- ") ||
+    line.startsWith("+++ ")
+  ) {
     return styles.patchLineMeta;
   }
   return styles.patchLineContext;
@@ -902,7 +891,6 @@ const styles = StyleSheet.create((theme) => ({
     minWidth: 0,
   },
   branchSwitchTitle: {
-    color: theme.text,
     fontSize: 13,
     lineHeight: 18,
   },
@@ -1005,12 +993,14 @@ const styles = StyleSheet.create((theme) => ({
     gap: Spacing.two,
   },
   additions: {
-    color: "#72E09F",
+    color: theme.isDark ? "#72E09F" : "#116329",
+    fontFamily: Fonts.mono,
     fontSize: 12,
     lineHeight: 16,
   },
   deletions: {
-    color: "#FF8F8F",
+    color: theme.isDark ? "#FF8F8F" : "#82071E",
+    fontFamily: Fonts.mono,
     fontSize: 12,
     lineHeight: 16,
   },
@@ -1022,12 +1012,16 @@ const styles = StyleSheet.create((theme) => ({
     overflow: "hidden",
   },
   fileHeader: {
+    alignItems: "center",
     borderBottomColor: "rgba(132, 145, 165, 0.18)",
     borderBottomWidth: 1,
+    flexDirection: "row",
+    gap: Spacing.two,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
   },
   fileTitleGroup: {
+    flex: 1,
     gap: Spacing.one,
     minWidth: 0,
   },
@@ -1047,7 +1041,6 @@ const styles = StyleSheet.create((theme) => ({
     width: 24,
   },
   statusBadgeText: {
-    color: theme.text,
     fontSize: 11,
     lineHeight: 14,
   },
@@ -1056,7 +1049,6 @@ const styles = StyleSheet.create((theme) => ({
     lineHeight: 16,
   },
   filePath: {
-    color: theme.text,
     flexShrink: 1,
     fontSize: 12,
     lineHeight: 17,
@@ -1064,8 +1056,8 @@ const styles = StyleSheet.create((theme) => ({
   diffFallback: {
     minWidth: 0,
   },
-  patchScroller: {
-    backgroundColor: "rgba(5, 8, 13, 0.72)",
+  patchSurface: {
+    backgroundColor: theme.surface,
   },
   patchLines: {
     paddingVertical: Spacing.two,
@@ -1078,22 +1070,22 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: Spacing.three,
   },
   patchLineAdded: {
-    backgroundColor: "rgba(46, 160, 67, 0.16)",
-    color: "#A7F3C1",
+    backgroundColor: theme.isDark ? "#173321" : "#E6FFEC",
+    color: theme.isDark ? "#A7F3C1" : "#116329",
   },
   patchLineDeleted: {
-    backgroundColor: "rgba(248, 81, 73, 0.14)",
-    color: "#FFB3B3",
+    backgroundColor: theme.isDark ? "#412626" : "#FFEBE9",
+    color: theme.isDark ? "#FFB3B3" : "#82071E",
   },
   patchLineHunk: {
     backgroundColor: theme.subtle,
     color: theme.text,
   },
   patchLineMeta: {
-    color: "#8B98AA",
+    color: theme.textSecondaryStrong,
   },
   patchLineContext: {
-    color: theme.textSecondary,
+    color: theme.text,
   },
   noPatch: {
     paddingHorizontal: Spacing.two,

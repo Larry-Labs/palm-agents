@@ -33,6 +33,7 @@ import { hapticSelection } from "@/lib/haptics";
 
 import { PromptMarkdownText } from "./PromptMarkdownText";
 import { ProtocolActivityCard } from "./ProtocolActivityCard";
+import { CodeWrapToggle } from "./code-wrap-toggle";
 import { messageSegmentRenderKey } from "./message-segment-key";
 import {
   messageCodeContentForRender,
@@ -1090,6 +1091,16 @@ export const HighlightedCodeBlock = memo(function HighlightedCodeBlock({
   style?: StyleProp<ViewStyle>;
 }) {
   const theme = useTheme();
+  const [wrapped, setWrapped] = useState(false);
+  const codeText = (
+    <HighlightedCodeText
+      code={code}
+      deferHighlight={deferHighlight}
+      language={language}
+      selectable
+    />
+  );
+
   return (
     <View
       style={[
@@ -1101,23 +1112,25 @@ export const HighlightedCodeBlock = memo(function HighlightedCodeBlock({
         style,
       ]}
     >
-      {language ? (
-        <NativeText
-          allowFontScaling={false}
-          maxFontSizeMultiplier={1}
-          style={[styles.codeBlockLanguage, { color: theme.textSecondary }]}
-        >
-          {language}
-        </NativeText>
-      ) : null}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <HighlightedCodeText
-          code={code}
-          deferHighlight={deferHighlight}
-          language={language}
-          selectable
-        />
-      </ScrollView>
+      <View style={styles.codeBlockHeader}>
+        {language ? (
+          <NativeText
+            allowFontScaling={false}
+            maxFontSizeMultiplier={1}
+            style={[styles.codeBlockLanguage, { color: theme.textSecondary }]}
+          >
+            {language}
+          </NativeText>
+        ) : null}
+        <CodeWrapToggle wrapped={wrapped} onToggle={() => setWrapped((value) => !value)} />
+      </View>
+      {wrapped ? (
+        codeText
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {codeText}
+        </ScrollView>
+      )}
     </View>
   );
 });
@@ -1454,15 +1467,19 @@ const styles = StyleSheet.create((theme) => ({
     marginBottom: 0,
     marginTop: 0,
   },
-  codeBlockLanguage: {
+  codeBlockHeader: {
+    alignItems: "center",
     borderBottomColor: "rgba(132, 145, 165, 0.18)",
     borderBottomWidth: 1,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+  },
+  codeBlockLanguage: {
+    flex: 1,
     fontFamily: Fonts.mono,
     fontSize: 11,
     lineHeight: 16,
     paddingHorizontal: 8,
-    paddingTop: 7,
-    paddingBottom: 6,
     textTransform: "uppercase",
   },
   codeBlockText: {

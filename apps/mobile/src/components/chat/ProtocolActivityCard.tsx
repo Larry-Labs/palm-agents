@@ -857,9 +857,9 @@ function planMarkdownStyle(
       marginTop: 0,
     },
     code: {
-      backgroundColor: "rgba(255, 255, 255, 0.08)",
-      borderColor: "rgba(255, 255, 255, 0.12)",
-      color: "#D7E0EA",
+      backgroundColor: theme.subtle,
+      borderColor: theme.border,
+      color: theme.text,
       fontFamily: Fonts.monoMedium,
       fontSize: 13,
     },

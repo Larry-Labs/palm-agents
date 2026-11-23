@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native-unistyles";
 
-import { MaxContentWidth, Spacing } from "@/constants/theme";
+import { MaxContentWidth } from "@/constants/theme";
 
 export const chatShellStyles = StyleSheet.create((theme) => ({
   chatBody: {
@@ -27,7 +27,6 @@ export const chatShellStyles = StyleSheet.create((theme) => ({
     backgroundColor: theme.background,
     flex: 1,
     gap: 0,
-    paddingTop: Spacing.one,
   },
   timeline: {
     flex: 1,

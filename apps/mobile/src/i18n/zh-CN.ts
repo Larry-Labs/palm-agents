@@ -11,6 +11,8 @@ export const zhCN = {
   of: "/",
   "changed files.": "个改动文件。",
   "more diff lines": "行差异",
+  "Wrap lines": "自动换行",
+  "Disable line wrap": "取消换行",
   " until {0}": "，{0} 重置",
   '"{0}" will be removed from this workspace.': "将从工作区中归档“{0}”。",
   ", {0} subagents, {1}": "，{0} 个子代理，{1}",
